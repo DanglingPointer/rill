@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill 0.2.0\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-14 00:09+0300\n"
+"POT-Creation-Date: 2026-09-14 00:16+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -40,8 +40,8 @@ msgstr ""
 
 #: data/io.github.sachesi.rill.metainfo.xml:9
 msgid ""
-"Rill is a small BitTorrent client for GNOME. Paste a magnet link or open "
-"a .torrent file, pick a folder, and it downloads."
+"Rill is a small BitTorrent client. Paste a magnet link or open a .torrent "
+"file, pick a folder, and it downloads."
 msgstr ""
 
 #: data/io.github.sachesi.rill.metainfo.xml:11

@@ -18,7 +18,15 @@ running in the background.
     sudo just install        # or: just prefix=$HOME/.local build install
 
 Build needs Rust 1.92, `blueprint-compiler`, `just`, gettext and the development packages
-for GTK and libadwaita.
+for GTK and libadwaita. Details, other prefixes and removal are in
+[docs/installing.md](docs/installing.md).
+
+## Documentation
+
+- [Installing](docs/installing.md)
+- [Using Rill](docs/usage.md)
+- [Contributing](CONTRIBUTING.md), including where things are in the code, and
+  [reporting a vulnerability](SECURITY.md)
 
 Rill has no bandwidth limits yet. The interface is available in English and Ukrainian.
 

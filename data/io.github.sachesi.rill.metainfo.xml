@@ -6,7 +6,7 @@
   <name>Rill</name>
   <summary>Download files over BitTorrent</summary>
   <description>
-    <p>Rill is a small BitTorrent client for GNOME. Paste a magnet link or open a .torrent file, pick a folder, and it downloads.</p>
+    <p>Rill is a small BitTorrent client. Paste a magnet link or open a .torrent file, pick a folder, and it downloads.</p>
     <ul>
       <li>Magnet links and .torrent files, from the add dialog, the file manager, a browser or a drop on the window</li>
       <li>Transfers grouped by what they are doing, with progress, speed and peers at a glance</li>

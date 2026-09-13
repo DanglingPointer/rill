@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2024"
 rust-version = "1.92"
 license = "GPL-3.0-or-later"
-description = "A BitTorrent client for GNOME"
+description = "A small BitTorrent client"
 repository = "https://github.com/sachesi/rill"
 readme = "README.md"
 
