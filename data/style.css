@@ -1,0 +1,14 @@
+progressbar.thin > trough,
+progressbar.thin > trough > progress {
+  min-height: 4px;
+}
+
+/* The state icon at the start of a torrent row: a disc tinted with the colour its
+   state class (.accent, .success, .error, .dim-label) gives the icon. */
+.torrent-icon {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 9999px;
+  -gtk-icon-size: 16px;
+  background-color: color-mix(in srgb, currentColor 15%, transparent);
+}

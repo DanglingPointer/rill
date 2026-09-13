@@ -1,0 +1,743 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the rill package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: rill 0.2.0\n"
+"Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
+"POT-Creation-Date: 2026-09-14 00:09+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: data/io.github.sachesi.rill.desktop:2
+#: data/io.github.sachesi.rill.metainfo.xml:6
+msgid "Rill"
+msgstr ""
+
+#: data/io.github.sachesi.rill.desktop:3
+msgid "BitTorrent Client"
+msgstr ""
+
+#: data/io.github.sachesi.rill.desktop:4
+#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:162
+#: src/tray.rs:38
+#, no-c-format
+msgid "Download files over BitTorrent"
+msgstr ""
+
+#: data/io.github.sachesi.rill.desktop:12
+msgid "torrent;magnet;download;p2p;"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:9
+msgid ""
+"Rill is a small BitTorrent client for GNOME. Paste a magnet link or open "
+"a .torrent file, pick a folder, and it downloads."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:11
+msgid ""
+"Magnet links and .torrent files, from the add dialog, the file manager, a "
+"browser or a drop on the window"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:12
+msgid ""
+"Transfers grouped by what they are doing, with progress, speed and peers at "
+"a glance"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:13
+msgid ""
+"Details of each torrent: a map of the pieces already on disk, its files, "
+"connected peers and trackers"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:14
+msgid ""
+"Sequential downloading per torrent, so a video can be watched while it "
+"arrives"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:15
+msgid "A limit on how many torrents download at once, with the rest queued"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:16
+msgid ""
+"Transfers continue in the background when the window is closed, on desktops "
+"with a system tray"
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:40
+msgid ""
+"The application id is now io.github.sachesi.rill. The dialogs adapt to "
+"narrow windows and open as bottom sheets on phones, and the details of a "
+"torrent move their tabs to the bottom when there is no room for them at the "
+"top."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:41
+msgid ""
+"The add dialog shows the folder a torrent will be saved to. Selection mode "
+"has a bar with Resume, Pause and Delete, a search that matches nothing says "
+"so, the keyboard shortcuts are listed in their own window, and the context "
+"menu of a torrent opens with the Menu key. Changing the number of "
+"simultaneous downloads applies at once."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:42
+msgid ""
+"Preferences no longer offer bandwidth limits, an upload limit, a seeding "
+"ratio or a logging switch: none of them had any effect on transfers. The "
+"Trackers page no longer marks every tracker as connected, and the Files page "
+"no longer shows checkboxes that did nothing."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:47
+msgid ""
+"The same torrent added as a magnet link and as a file is one transfer, not "
+"two. A torrent you pause is no longer resumed by the download queue, a "
+"failed one says so and can be retried, and one that finishes without a final "
+"update is shown as completed. Links and files that are not torrents are "
+"refused in the add dialog instead of turning into a transfer that never "
+"starts."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:48
+msgid ""
+"Magnet links can be dropped on the window, closing the window quits when "
+"there is no system tray to reopen it from, and more of the interface is "
+"translated."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:53
+msgid ""
+"More reliable tracking of each torrent's state across pauses and restarts."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:58
+msgid ""
+"Ukrainian translation. The source of a torrent can be copied from its "
+"details, and its folder opened from the context menu. File paths inside a "
+"torrent cannot point outside the download folder, and trackers on link-local "
+"addresses are refused."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:63
+msgid "A new application icon."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:68
+msgid ""
+"Database writes and torrent metadata parsing no longer run on the thread "
+"that draws the window."
+msgstr ""
+
+#: data/io.github.sachesi.rill.metainfo.xml:73
+msgid "First release."
+msgstr ""
+
+#. Translators: put your name here, one per line, optionally with an email address.
+#: src/application.rs:164
+#, no-c-format
+msgid "translator-credits"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:115 ui/shortcuts_dialog.ui:21
+#, no-c-format
+msgid "Add Magnet Link"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:122 src/window.rs:347 ui/shortcuts_dialog.ui:15
+#, no-c-format
+msgid "Add Torrent File"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:140 src/window.rs:342
+#, no-c-format
+msgid "Torrent Files"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:145
+#, no-c-format
+msgid "Choose a Torrent File"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:167
+#, no-c-format
+msgid "Choose a Download Folder"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:203
+#, no-c-format
+msgid "This is not a magnet link"
+msgstr ""
+
+#. Translators: %s is a file name.
+#: src/dialogs/add_torrent.rs:230
+#, no-c-format
+msgid "“%s” is not a torrent file"
+msgstr ""
+
+#: src/dialogs/preferences.rs:106
+#, no-c-format
+msgid "Errors"
+msgstr ""
+
+#: src/dialogs/preferences.rs:107
+#, no-c-format
+msgid "Warnings"
+msgstr ""
+
+#: src/dialogs/preferences.rs:108
+#, no-c-format
+msgid "Information"
+msgstr ""
+
+#: src/dialogs/preferences.rs:109
+#, no-c-format
+msgid "Debugging"
+msgstr ""
+
+#: src/dialogs/preferences.rs:110
+#, no-c-format
+msgid "Everything"
+msgstr ""
+
+#: src/dialogs/preferences.rs:136
+#, no-c-format
+msgid "Could not save the setting"
+msgstr ""
+
+#: src/dialogs/preferences.rs:144
+#, no-c-format
+msgid "Choose the Download Folder"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:127
+#, no-c-format
+msgid "No peers connected"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:129
+#, no-c-format
+msgid "No trackers"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:150
+#, no-c-format
+msgid "Source copied"
+msgstr ""
+
+#. Translators: %s is a percentage, "42.0".
+#: src/dialogs/torrent_info.rs:196
+#, no-c-format
+msgid "%s%"
+msgstr ""
+
+#. Translators: state and percentage done, "Downloading · 42.0%".
+#: src/dialogs/torrent_info.rs:200
+#, no-c-format
+msgid "Downloading · %s"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:202
+#, no-c-format
+msgid "Paused · %s"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:203
+#, no-c-format
+msgid "Completed"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:204
+#, no-c-format
+msgid "Failed"
+msgstr ""
+
+#. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
+#: src/dialogs/torrent_info.rs:209 src/torrent_row.rs:282
+#, no-c-format
+msgid "%1 of %2"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:213 src/torrent_row.rs:289
+#, no-c-format
+msgid "Waiting for metadata"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:230
+#, no-c-format
+msgid "None"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:231
+#, no-c-format
+msgid "Unknown"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:270
+#, no-c-format
+msgid "Could not save the sequential setting"
+msgstr ""
+
+#: src/dialogs/torrent_info.rs:301
+#, no-c-format
+msgid "Encrypted connection"
+msgstr ""
+
+#. Translators: a torrent without a name yet; %s is the start of its info hash.
+#: src/torrent_row.rs:160
+#, no-c-format
+msgid "Torrent %s"
+msgstr ""
+
+#: src/torrent_row.rs:184
+#, no-c-format
+msgid "Pause"
+msgstr ""
+
+#: src/torrent_row.rs:190
+#, no-c-format
+msgid "Resume"
+msgstr ""
+
+#: src/torrent_row.rs:196 src/torrent_row.rs:202
+#, no-c-format
+msgid "Delete"
+msgstr ""
+
+#: src/torrent_row.rs:252
+#, no-c-format
+msgid "Could not open the folder"
+msgstr ""
+
+#: src/torrent_row.rs:290
+#, no-c-format
+msgid "Size unknown"
+msgstr ""
+
+#: src/torrent_row.rs:299
+#, no-c-format
+msgid "%d peer"
+msgid_plural "%d peers"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/tray.rs:53
+#, no-c-format
+msgid "Show Rill"
+msgstr ""
+
+#: src/tray.rs:62 ui/shortcuts_dialog.ui:51
+#, no-c-format
+msgid "Quit"
+msgstr ""
+
+#. Translators: a transfer rate; %s is a size such as "1.5 MiB".
+#: src/util.rs:24
+#, no-c-format
+msgid "%s/s"
+msgstr ""
+
+#. Translators: seconds.
+#: src/util.rs:39
+#, no-c-format
+msgid "%1s"
+msgstr ""
+
+#. Translators: minutes and seconds.
+#: src/util.rs:42
+#, no-c-format
+msgid "%1m %2s"
+msgstr ""
+
+#. Translators: hours and minutes.
+#: src/util.rs:45
+#, no-c-format
+msgid "%1h %2m"
+msgstr ""
+
+#. Translators: days and hours.
+#: src/util.rs:48
+#, no-c-format
+msgid "%1d %2h"
+msgstr ""
+
+#: src/window.rs:192
+#, no-c-format
+msgid "Rill is still running"
+msgstr ""
+
+#: src/window.rs:194
+#, no-c-format
+msgid ""
+"Downloads continue in the background. Use the tray icon to reopen or quit "
+"Rill."
+msgstr ""
+
+#: src/window.rs:361
+#, no-c-format
+msgid "Only local files can be added"
+msgstr ""
+
+#: src/window.rs:470
+#, no-c-format
+msgid "Select Torrents"
+msgstr ""
+
+#: src/window.rs:472
+#, no-c-format
+msgid "%d selected"
+msgid_plural "%d selected"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/window.rs:535
+#, no-c-format
+msgid "Delete Torrent?"
+msgstr ""
+
+#. Translators: %s is the name of a torrent.
+#: src/window.rs:537
+#, no-c-format
+msgid "“%s” will be removed from the list."
+msgstr ""
+
+#: src/window.rs:541
+#, no-c-format
+msgid "Delete Torrents?"
+msgstr ""
+
+#: src/window.rs:543
+#, no-c-format
+msgid "%d torrent will be removed from the list."
+msgid_plural "%d torrents will be removed from the list."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/window.rs:551
+#, no-c-format
+msgid "Also delete the downloaded files"
+msgstr ""
+
+#: src/window.rs:559 ui/add_torrent_dialog.ui:21 ui/window.ui:64
+#, no-c-format
+msgid "_Cancel"
+msgstr ""
+
+#: src/window.rs:560
+#, no-c-format
+msgid "_Delete"
+msgstr ""
+
+#: src/window.rs:628
+#, no-c-format
+msgid "Could not delete the downloaded files: %s"
+msgstr ""
+
+#: src/window.rs:637
+#, no-c-format
+msgid "Could not find the downloaded files"
+msgstr ""
+
+#. Translators: %1 is a torrent name, %2 the reason it failed.
+#: src/window.rs:720
+#, no-c-format
+msgid "“%1” failed: %2"
+msgstr ""
+
+#: src/window.rs:732
+#, no-c-format
+msgid "Download Complete"
+msgstr ""
+
+#: src/window.rs:805
+#, no-c-format
+msgid "Could not save the torrent: %s"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:28
+msgid "_Add"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:45
+msgid "Magnet Link"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:69
+msgid "Torrent File"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:70
+msgid "None chosen"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:86 ui/preferences_dialog.ui:18
+#: ui/torrent_info_dialog.ui:177
+msgid "Download Folder"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:98
+msgid "Start Immediately"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:104 ui/torrent_info_dialog.ui:166
+msgid "Sequential Download"
+msgstr ""
+
+#: ui/add_torrent_dialog.ui:105 ui/torrent_info_dialog.ui:167
+msgid "Download pieces in order, so the start of a file can be opened early"
+msgstr ""
+
+#: ui/preferences_dialog.ui:15
+msgid "Downloads"
+msgstr ""
+
+#: ui/preferences_dialog.ui:34
+msgid "Simultaneous Downloads"
+msgstr ""
+
+#: ui/preferences_dialog.ui:35
+msgid "Further torrents wait until one finishes or is paused"
+msgstr ""
+
+#: ui/preferences_dialog.ui:51
+msgid "Network"
+msgstr ""
+
+#: ui/preferences_dialog.ui:54
+msgid "Listening Port"
+msgstr ""
+
+#: ui/preferences_dialog.ui:55
+msgid ""
+"Used by torrents started from now on. 0 gives each torrent a port of its own."
+msgstr ""
+
+#: ui/preferences_dialog.ui:71
+msgid "Troubleshooting"
+msgstr ""
+
+#: ui/preferences_dialog.ui:74
+msgid "Log Level"
+msgstr ""
+
+#: ui/preferences_dialog.ui:75
+msgid "How much Rill writes to its standard error output"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:12
+msgid "General"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:27 ui/window.ui:89
+msgid "Search"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:33
+msgid "Preferences"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:39
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:45
+msgid "Close Window"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:59
+msgid "Torrents"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:62
+msgid "Show Menu"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:68
+msgid "Select All"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:69 ui/shortcuts_dialog.ui:76
+msgid "In selection mode"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:75
+msgid "Delete Selected"
+msgstr ""
+
+#: ui/shortcuts_dialog.ui:82
+msgid "Leave Selection Mode"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:41
+msgid "Overview"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:95
+msgid "Pieces on disk, from the start of the torrent to the end"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:111
+msgid "Transfer"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:114
+msgid "Download Speed"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:127
+msgid "Upload Speed"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:140 ui/torrent_info_dialog.ui:309
+msgid "Peers"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:153
+msgid "Time Remaining"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:174
+msgid "Location"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:187
+msgid "Source"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:191
+msgid "Copy to clipboard"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:212
+msgid "Files"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:222
+msgid "No File List Yet"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:223
+msgid "The files appear once the torrent's metadata has been downloaded"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:332
+msgid "Trackers"
+msgstr ""
+
+#: ui/torrent_info_dialog.ui:338
+msgid "Trackers listed by the torrent"
+msgstr ""
+
+#: ui/torrent_row.ui:12 ui/torrent_row.ui:62 ui/window.ui:238
+msgid "_Pause"
+msgstr ""
+
+#: ui/torrent_row.ui:17 ui/torrent_row.ui:58 ui/window.ui:231
+msgid "_Resume"
+msgstr ""
+
+#: ui/torrent_row.ui:22
+msgid "_Retry"
+msgstr ""
+
+#: ui/torrent_row.ui:27
+msgid "_Open Folder"
+msgstr ""
+
+#: ui/torrent_row.ui:34
+msgid "_Select"
+msgstr ""
+
+#: ui/torrent_row.ui:40 ui/torrent_row.ui:68 ui/window.ui:245
+msgid "_Delete…"
+msgstr ""
+
+#: ui/torrent_row.ui:48
+msgid "Select _All"
+msgstr ""
+
+#: ui/torrent_row.ui:52
+msgid "Select _None"
+msgstr ""
+
+#: ui/window.ui:12
+msgid "Add Torrent _File…"
+msgstr ""
+
+#: ui/window.ui:16
+msgid "Add _Magnet Link…"
+msgstr ""
+
+#: ui/window.ui:24
+msgid "_Select Torrents"
+msgstr ""
+
+#: ui/window.ui:30
+msgid "_Preferences"
+msgstr ""
+
+#: ui/window.ui:34
+msgid "_Keyboard Shortcuts"
+msgstr ""
+
+#: ui/window.ui:38
+msgid "_About Rill"
+msgstr ""
+
+#: ui/window.ui:42
+msgid "_Quit"
+msgstr ""
+
+#: ui/window.ui:73
+msgid "Add Torrent"
+msgstr ""
+
+#: ui/window.ui:81
+msgid "Main Menu"
+msgstr ""
+
+#: ui/window.ui:104
+msgid "Search torrents"
+msgstr ""
+
+#: ui/window.ui:122
+msgid "No Torrents"
+msgstr ""
+
+#: ui/window.ui:123
+msgid "Add a magnet link or a .torrent file, or drop one on this window"
+msgstr ""
+
+#: ui/window.ui:134
+msgid "No Results"
+msgstr ""
+
+#: ui/window.ui:135
+msgid "No torrent name matches the search"
+msgstr ""
+
+#: ui/window.ui:159
+msgid "Downloading"
+msgstr ""
+
+#: ui/window.ui:178
+msgid "Paused"
+msgstr ""
+
+#: ui/window.ui:198
+msgid "Finished"
+msgstr ""

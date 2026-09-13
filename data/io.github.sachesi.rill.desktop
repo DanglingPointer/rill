@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Rill
+GenericName=BitTorrent Client
+Comment=Download files over BitTorrent
+Exec=rill %U
+Icon=io.github.sachesi.rill
+Terminal=false
+Type=Application
+Categories=GTK;Network;P2P;FileTransfer;
+MimeType=application/x-bittorrent;x-scheme-handler/magnet;
+StartupNotify=true
+Keywords=torrent;magnet;download;p2p;

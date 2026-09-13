@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/io/github/sachesi/rill">
+    <file>style.css</file>
+    <file preprocess="xml-stripblanks">ui/window.ui</file>
+    <file preprocess="xml-stripblanks">ui/torrent_row.ui</file>
+    <file preprocess="xml-stripblanks">ui/add_torrent_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/torrent_info_dialog.ui</file>
+    <file preprocess="xml-stripblanks">ui/preferences_dialog.ui</file>
+    <file preprocess="xml-stripblanks" alias="shortcuts-dialog.ui">ui/shortcuts_dialog.ui</file>
+    <file preprocess="xml-stripblanks" alias="icons/scalable/apps/io.github.sachesi.rill.svg">icons/hicolor/scalable/apps/io.github.sachesi.rill.svg</file>
+    <file preprocess="xml-stripblanks" alias="icons/symbolic/apps/io.github.sachesi.rill-symbolic.svg">icons/hicolor/symbolic/apps/io.github.sachesi.rill-symbolic.svg</file>
+  </gresource>
+</gresources>

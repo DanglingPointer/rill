@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sachesi.rill</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Rill</name>
+  <summary>Download files over BitTorrent</summary>
+  <description>
+    <p>Rill is a small BitTorrent client for GNOME. Paste a magnet link or open a .torrent file, pick a folder, and it downloads.</p>
+    <ul>
+      <li>Magnet links and .torrent files, from the add dialog, the file manager, a browser or a drop on the window</li>
+      <li>Transfers grouped by what they are doing, with progress, speed and peers at a glance</li>
+      <li>Details of each torrent: a map of the pieces already on disk, its files, connected peers and trackers</li>
+      <li>Sequential downloading per torrent, so a video can be watched while it arrives</li>
+      <li>A limit on how many torrents download at once, with the rest queued</li>
+      <li>Transfers continue in the background when the window is closed, on desktops with a system tray</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.sachesi.rill.desktop</launchable>
+  <url type="homepage">https://github.com/sachesi/rill</url>
+  <url type="bugtracker">https://github.com/sachesi/rill/issues</url>
+  <url type="vcs-browser">https://github.com/sachesi/rill</url>
+  <developer id="io.github.sachesi"><name translate="no">sachesi</name></developer>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <mediatype>application/x-bittorrent</mediatype>
+    <mediatype>x-scheme-handler/magnet</mediatype>
+  </provides>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.2.0" date="2026-09-14">
+      <description>
+        <p>The application id is now io.github.sachesi.rill. The dialogs adapt to narrow windows and open as bottom sheets on phones, and the details of a torrent move their tabs to the bottom when there is no room for them at the top.</p>
+        <p>The add dialog shows the folder a torrent will be saved to. Selection mode has a bar with Resume, Pause and Delete, a search that matches nothing says so, the keyboard shortcuts are listed in their own window, and the context menu of a torrent opens with the Menu key. Changing the number of simultaneous downloads applies at once.</p>
+        <p>Preferences no longer offer bandwidth limits, an upload limit, a seeding ratio or a logging switch: none of them had any effect on transfers. The Trackers page no longer marks every tracker as connected, and the Files page no longer shows checkboxes that did nothing.</p>
+      </description>
+    </release>
+    <release version="0.1.10" date="2026-07-11">
+      <description>
+        <p>The same torrent added as a magnet link and as a file is one transfer, not two. A torrent you pause is no longer resumed by the download queue, a failed one says so and can be retried, and one that finishes without a final update is shown as completed. Links and files that are not torrents are refused in the add dialog instead of turning into a transfer that never starts.</p>
+        <p>Magnet links can be dropped on the window, closing the window quits when there is no system tray to reopen it from, and more of the interface is translated.</p>
+      </description>
+    </release>
+    <release version="0.1.9" date="2026-06-05">
+      <description>
+        <p>More reliable tracking of each torrent's state across pauses and restarts.</p>
+      </description>
+    </release>
+    <release version="0.1.8" date="2026-06-02">
+      <description>
+        <p>Ukrainian translation. The source of a torrent can be copied from its details, and its folder opened from the context menu. File paths inside a torrent cannot point outside the download folder, and trackers on link-local addresses are refused.</p>
+      </description>
+    </release>
+    <release version="0.1.4" date="2026-06-01">
+      <description>
+        <p>A new application icon.</p>
+      </description>
+    </release>
+    <release version="0.1.3" date="2026-05-31">
+      <description>
+        <p>Database writes and torrent metadata parsing no longer run on the thread that draws the window.</p>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-05-30">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,13 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffbe6f"/>
+      <stop offset="100%" stop-color="#f5a25d"/>
+    </linearGradient>
+  </defs>
+  <path d="M24 90 h80 a4 4 0 0 1 4 4 v4 a4 4 0 0 1 -4 4 H24 a4 4 0 0 1 -4 -4 v-4 a4 4 0 0 1 4 -4 z" fill="#3d3846"/>
+  <path d="M24 86 h80 a4 4 0 0 1 4 4 v4 a4 4 0 0 1 -4 4 H24 a4 4 0 0 1 -4 -4 v-4 a4 4 0 0 1 4 -4 z" fill="#5e5c64"/>
+  <rect x="40" y="90" width="48" height="4" rx="2" fill="#241f31"/>
+  <rect x="56" y="22" width="16" height="40" rx="6" fill="url(#shaft)"/>
+  <path d="M64 80 L42 54 L86 54 Z" fill="#e66100"/>
+</svg>

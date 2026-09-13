@@ -1,0 +1,95 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $RillAddTorrentDialog: Adw.Dialog {
+  content-width: 480;
+  default-widget: add_button;
+  focus-widget: magnet_row;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Button {
+        label: _("_Cancel");
+        use-underline: true;
+        clicked => $on_cancel_clicked() swapped;
+      }
+
+      [end]
+      Button add_button {
+        label: _("_Add");
+        use-underline: true;
+        sensitive: false;
+        clicked => $on_add_clicked() swapped;
+
+        styles [
+          "suggested-action",
+        ]
+      }
+    }
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup magnet_group {
+        Adw.EntryRow magnet_row {
+          title: _("Magnet Link");
+          activates-default: true;
+          changed => $on_magnet_changed() swapped;
+        }
+
+        Label magnet_error {
+          halign: start;
+          margin-top: 6;
+          margin-start: 12;
+          wrap: true;
+          visible: false;
+
+          styles [
+            "caption",
+            "error",
+          ]
+        }
+      }
+
+      Adw.PreferencesGroup file_group {
+        Adw.ActionRow file_row {
+          title: _("Torrent File");
+          subtitle: _("None chosen");
+          activatable: true;
+          activated => $on_choose_file() swapped;
+
+          [suffix]
+          Image {
+            icon-name: "document-open-symbolic";
+          }
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Adw.ActionRow folder_row {
+          title: _("Download Folder");
+          activatable: true;
+          activated => $on_choose_folder() swapped;
+
+          [suffix]
+          Image {
+            icon-name: "folder-open-symbolic";
+          }
+        }
+
+        Adw.SwitchRow start_row {
+          title: _("Start Immediately");
+          active: true;
+        }
+
+        Adw.SwitchRow sequential_row {
+          title: _("Sequential Download");
+          subtitle: _("Download pieces in order, so the start of a file can be opened early");
+        }
+      }
+    };
+  };
+}

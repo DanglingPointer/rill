@@ -1,0 +1,303 @@
+using Gtk 4.0;
+using Adw 1;
+using Gio 2.0;
+
+template $RillTorrentInfoDialog: Adw.Dialog {
+  content-width: 560;
+  content-height: 600;
+  width-request: 360;
+  height-request: 294;
+
+  Adw.Breakpoint {
+    condition ("max-width: 540sp")
+
+    setters {
+      switcher_bar.reveal: true;
+      header_bar.title-widget: null;
+      name_label.visible: false;
+    }
+  }
+
+  child: Adw.ToastOverlay toast_overlay {
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar header_bar {
+        title-widget: Adw.ViewSwitcher {
+          stack: view_stack;
+          policy: wide;
+        };
+      }
+
+      content: Adw.ViewStack view_stack {
+        Adw.ViewStackPage {
+          name: "overview";
+          title: _("Overview");
+          icon-name: "dialog-information-symbolic";
+
+          child: Adw.PreferencesPage {
+            Adw.PreferencesGroup {
+              Box {
+                orientation: vertical;
+                spacing: 6;
+
+                Label name_label {
+                  wrap: true;
+                  wrap-mode: word_char;
+                  justify: center;
+                  selectable: true;
+
+                  styles [
+                    "title-4",
+                  ]
+                }
+
+                Label state_label {
+                  styles [
+                    "heading",
+                  ]
+                }
+
+                Label size_label {
+                  styles [
+                    "dim-label",
+                  ]
+                }
+
+                Adw.Clamp {
+                  maximum-size: 300;
+                  margin-top: 12;
+
+                  child: Box {
+                    orientation: vertical;
+                    spacing: 6;
+
+                    ProgressBar progress_bar {
+                      styles [
+                        "thin",
+                      ]
+                    }
+
+                    DrawingArea piece_map {
+                      content-height: 10;
+                      visible: false;
+                      tooltip-text: _("Pieces on disk, from the start of the torrent to the end");
+
+                      styles [
+                        "accent",
+                      ]
+                    }
+                  };
+                }
+              }
+            }
+
+            Adw.PreferencesGroup {
+              title: _("Transfer");
+
+              Adw.ActionRow {
+                title: _("Download Speed");
+
+                [suffix]
+                Label download_speed_label {
+                  styles [
+                    "dim-label",
+                    "numeric",
+                  ]
+                }
+              }
+
+              Adw.ActionRow {
+                title: _("Upload Speed");
+
+                [suffix]
+                Label upload_speed_label {
+                  styles [
+                    "dim-label",
+                    "numeric",
+                  ]
+                }
+              }
+
+              Adw.ActionRow {
+                title: _("Peers");
+
+                [suffix]
+                Label peers_label {
+                  styles [
+                    "dim-label",
+                    "numeric",
+                  ]
+                }
+              }
+
+              Adw.ActionRow {
+                title: _("Time Remaining");
+
+                [suffix]
+                Label eta_label {
+                  styles [
+                    "dim-label",
+                    "numeric",
+                  ]
+                }
+              }
+
+              Adw.SwitchRow sequential_row {
+                title: _("Sequential Download");
+                subtitle: _("Download pieces in order, so the start of a file can be opened early");
+              }
+            }
+
+            Adw.PreferencesGroup {
+              title: _("Location");
+
+              Adw.ActionRow folder_row {
+                title: _("Download Folder");
+                use-markup: false;
+                subtitle-selectable: true;
+
+                styles [
+                  "property",
+                ]
+              }
+
+              Adw.ActionRow source_row {
+                title: _("Source");
+                use-markup: false;
+                subtitle-lines: 2;
+                activatable: true;
+                tooltip-text: _("Copy to clipboard");
+                activated => $on_copy_source() swapped;
+
+                [suffix]
+                Image {
+                  icon-name: "edit-copy-symbolic";
+                }
+
+                styles [
+                  "property",
+                ]
+              }
+            }
+          };
+        }
+
+        Adw.ViewStackPage {
+          name: "files";
+          title: _("Files");
+          icon-name: "folder-symbolic";
+
+          child: Stack files_stack {
+            StackPage {
+              name: "empty";
+
+              child: Adw.StatusPage {
+                icon-name: "folder-symbolic";
+                title: _("No File List Yet");
+                description: _("The files appear once the torrent's metadata has been downloaded");
+
+                styles [
+                  "compact",
+                ]
+              };
+            }
+
+            StackPage {
+              name: "list";
+
+              child: ScrolledWindow {
+                hscrollbar-policy: never;
+
+                child: ListView {
+                  model: NoSelection {
+                    model: Gio.ListStore files {
+                      item-type: typeof<$RillFileItem>;
+                    };
+                  };
+
+                  factory: BuilderListItemFactory {
+                    template ListItem {
+                      activatable: false;
+
+                      child: Box {
+                        spacing: 12;
+                        margin-top: 8;
+                        margin-bottom: 8;
+                        margin-start: 6;
+                        margin-end: 6;
+
+                        Label {
+                          label: bind template.item as <$RillFileItem>.path;
+                          xalign: 0;
+                          hexpand: true;
+                          ellipsize: middle;
+                        }
+
+                        Label {
+                          label: bind template.item as <$RillFileItem>.size-text;
+
+                          styles [
+                            "caption",
+                            "dim-label",
+                            "numeric",
+                          ]
+                        }
+                      };
+                    }
+                  };
+
+                  styles [
+                    "rich-list",
+                  ]
+                };
+              };
+            }
+          };
+        }
+
+        Adw.ViewStackPage {
+          name: "peers";
+          title: _("Peers");
+          icon-name: "system-users-symbolic";
+
+          child: Adw.PreferencesPage {
+            Adw.PreferencesGroup {
+              ListBox peers_list {
+                selection-mode: none;
+
+                styles [
+                  "boxed-list",
+                ]
+              }
+            }
+          };
+        }
+
+        Adw.ViewStackPage {
+          name: "trackers";
+          title: _("Trackers");
+          icon-name: "network-server-symbolic";
+
+          child: Adw.PreferencesPage {
+            Adw.PreferencesGroup {
+              description: _("Trackers listed by the torrent");
+
+              ListBox trackers_list {
+                selection-mode: none;
+
+                styles [
+                  "boxed-list",
+                ]
+              }
+            }
+          };
+        }
+      };
+
+      [bottom]
+      Adw.ViewSwitcherBar switcher_bar {
+        stack: view_stack;
+      }
+    };
+  };
+}

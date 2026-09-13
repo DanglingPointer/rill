@@ -1,0 +1,166 @@
+use std::cell::OnceCell;
+
+use adw::prelude::*;
+use adw::subclass::prelude::*;
+use gettextrs::gettext;
+use gtk::{gio, glib};
+
+use crate::logging;
+use crate::storage::{AppSettings, Storage};
+use crate::window::RillWindow;
+
+mod imp {
+    use super::*;
+
+    #[derive(Default, gtk::CompositeTemplate)]
+    #[template(resource = "/io/github/sachesi/rill/ui/preferences_dialog.ui")]
+    pub struct PreferencesDialog {
+        #[template_child]
+        pub folder_row: TemplateChild<adw::ActionRow>,
+        #[template_child]
+        pub max_downloads_row: TemplateChild<adw::SpinRow>,
+        #[template_child]
+        pub port_row: TemplateChild<adw::SpinRow>,
+        #[template_child]
+        pub log_level_row: TemplateChild<adw::ComboRow>,
+
+        pub window: glib::WeakRef<RillWindow>,
+        pub storage: OnceCell<Storage>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for PreferencesDialog {
+        const NAME: &'static str = "RillPreferencesDialog";
+        type Type = super::PreferencesDialog;
+        type ParentType = adw::PreferencesDialog;
+
+        fn class_init(klass: &mut Self::Class) {
+            klass.bind_template();
+            klass.bind_template_callbacks();
+        }
+
+        fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
+            obj.init_template();
+        }
+    }
+
+    impl ObjectImpl for PreferencesDialog {}
+    impl WidgetImpl for PreferencesDialog {}
+    impl AdwDialogImpl for PreferencesDialog {}
+    impl PreferencesDialogImpl for PreferencesDialog {}
+
+    #[gtk::template_callbacks]
+    impl PreferencesDialog {
+        #[template_callback]
+        fn on_choose_folder(&self) {
+            self.obj().choose_folder();
+        }
+
+        #[template_callback]
+        fn on_max_downloads_changed(&self) {
+            let value = self.max_downloads_row.value() as i32;
+            let obj = self.obj();
+            obj.save(|s| s.max_active_downloads = value);
+            if let Some(window) = self.window.upgrade() {
+                window.check_queue();
+            }
+        }
+
+        #[template_callback]
+        fn on_port_changed(&self) {
+            let value = self.port_row.value() as u16;
+            self.obj().save(|s| s.pwp_port = value);
+        }
+
+        #[template_callback]
+        fn on_log_level_changed(&self) {
+            let level = logging::LEVELS
+                .get(self.log_level_row.selected() as usize)
+                .copied()
+                .unwrap_or("info");
+            self.obj().save(|s| s.log_level = level.to_string());
+        }
+    }
+}
+
+glib::wrapper! {
+    pub struct PreferencesDialog(ObjectSubclass<imp::PreferencesDialog>)
+        @extends adw::PreferencesDialog, adw::Dialog, gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget, gtk::ShortcutManager;
+}
+
+impl PreferencesDialog {
+    pub fn new(window: &RillWindow, storage: Storage) -> Self {
+        let dialog: Self = glib::Object::new();
+        let imp = dialog.imp();
+        let settings = storage.load_settings();
+        imp.window.set(Some(window));
+
+        // Filled in before the storage is set, so that nothing is written back.
+        imp.folder_row
+            .set_subtitle(&settings.download_folder_path().to_string_lossy());
+        imp.max_downloads_row
+            .set_value(settings.max_active_downloads as f64);
+        imp.port_row.set_value(settings.pwp_port as f64);
+        let levels = [
+            gettext("Errors"),
+            gettext("Warnings"),
+            gettext("Information"),
+            gettext("Debugging"),
+            gettext("Everything"),
+        ];
+        let levels: Vec<&str> = levels.iter().map(String::as_str).collect();
+        imp.log_level_row
+            .set_model(Some(&gtk::StringList::new(&levels)));
+        let level = logging::LEVELS
+            .iter()
+            .position(|l| *l == settings.log_level)
+            .unwrap_or(2);
+        imp.log_level_row.set_selected(level as u32);
+
+        imp.storage.set(storage).ok();
+        dialog
+    }
+
+    /// Changes one setting and stores it, saying so when that fails.
+    fn save(&self, change: impl FnOnce(&mut AppSettings)) {
+        let Some(storage) = self.imp().storage.get() else {
+            return;
+        };
+        let mut settings = storage.load_settings();
+        change(&mut settings);
+        match storage.save_settings(&settings) {
+            Ok(()) => logging::apply_settings(&settings),
+            Err(e) => {
+                log::warn!("Failed to save settings: {e}");
+                self.add_toast(adw::Toast::new(&gettext("Could not save the setting")));
+            }
+        }
+    }
+
+    fn choose_folder(&self) {
+        let current = self.imp().folder_row.subtitle().unwrap_or_default();
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choose the Download Folder"))
+            .initial_folder(&gio::File::for_path(current.as_str()))
+            .modal(true)
+            .build();
+        chooser.select_folder(
+            self.root().and_downcast_ref::<gtk::Window>(),
+            gio::Cancellable::NONE,
+            glib::clone!(
+                #[weak(rename_to = dialog)]
+                self,
+                move |result| {
+                    if let Ok(Some(path)) = result.map(|f| f.path()) {
+                        dialog
+                            .imp()
+                            .folder_row
+                            .set_subtitle(&path.to_string_lossy());
+                        dialog.save(|s| s.download_folder = path.to_string_lossy().into_owned());
+                    }
+                }
+            ),
+        );
+    }
+}

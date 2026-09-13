@@ -1,0 +1,69 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.ShortcutsDialog shortcuts_dialog {
+  Adw.ShortcutsSection {
+    title: _("General");
+
+    Adw.ShortcutsItem {
+      title: _("Add Torrent File");
+      accelerator: "<Control>o";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Add Magnet Link");
+      accelerator: "<Control>n";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Search");
+      accelerator: "<Control>f";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Preferences");
+      accelerator: "<Control>comma";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Keyboard Shortcuts");
+      accelerator: "<Control>question";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Close Window");
+      accelerator: "<Control>w";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Quit");
+      accelerator: "<Control>q";
+    }
+  }
+
+  Adw.ShortcutsSection {
+    title: _("Torrents");
+
+    Adw.ShortcutsItem {
+      title: _("Show Menu");
+      accelerator: "<Shift>F10 Menu";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Select All");
+      subtitle: _("In selection mode");
+      accelerator: "<Control>a";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Delete Selected");
+      subtitle: _("In selection mode");
+      accelerator: "Delete";
+    }
+
+    Adw.ShortcutsItem {
+      title: _("Leave Selection Mode");
+      accelerator: "Escape";
+    }
+  }
+}

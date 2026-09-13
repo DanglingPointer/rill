@@ -1,0 +1,68 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $RillPreferencesDialog: Adw.PreferencesDialog {
+  content-width: 480;
+
+  Adw.PreferencesPage {
+    Adw.PreferencesGroup {
+      title: _("Downloads");
+
+      Adw.ActionRow folder_row {
+        title: _("Download Folder");
+        use-markup: false;
+        activatable: true;
+        activated => $on_choose_folder() swapped;
+
+        [suffix]
+        Image {
+          icon-name: "folder-open-symbolic";
+        }
+
+        styles [
+          "property",
+        ]
+      }
+
+      Adw.SpinRow max_downloads_row {
+        title: _("Simultaneous Downloads");
+        subtitle: _("Further torrents wait until one finishes or is paused");
+        notify::value => $on_max_downloads_changed() swapped;
+
+        adjustment: Adjustment {
+          lower: 1;
+          upper: 50;
+          step-increment: 1;
+          page-increment: 5;
+        };
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Network");
+
+      Adw.SpinRow port_row {
+        title: _("Listening Port");
+        subtitle: _("Used by torrents started from now on. 0 gives each torrent a port of its own.");
+        notify::value => $on_port_changed() swapped;
+
+        adjustment: Adjustment {
+          lower: 0;
+          upper: 65535;
+          step-increment: 1;
+          page-increment: 10;
+        };
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Troubleshooting");
+
+      Adw.ComboRow log_level_row {
+        title: _("Log Level");
+        subtitle: _("How much Rill writes to its standard error output");
+        notify::selected => $on_log_level_changed() swapped;
+      }
+    }
+  }
+}

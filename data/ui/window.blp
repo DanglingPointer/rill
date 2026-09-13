@@ -1,0 +1,245 @@
+using Gtk 4.0;
+using Adw 1;
+
+menu add_menu {
+  section {
+    item {
+      label: _("Add Torrent _File…");
+      action: "win.add-file";
+    }
+
+    item {
+      label: _("Add _Magnet Link…");
+      action: "win.add-magnet";
+    }
+  }
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: _("_Select Torrents");
+      action: "win.select";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Preferences");
+      action: "app.preferences";
+    }
+
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "app.shortcuts";
+    }
+
+    item {
+      label: _("_About Rill");
+      action: "app.about";
+    }
+
+    item {
+      label: _("_Quit");
+      action: "app.quit";
+    }
+  }
+}
+
+template $RillWindow: Adw.ApplicationWindow {
+  title: "Rill";
+  width-request: 360;
+  height-request: 294;
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        title-widget: Adw.WindowTitle window_title {
+          title: "Rill";
+        };
+
+        [start]
+        Button {
+          label: _("_Cancel");
+          use-underline: true;
+          action-name: "win.select";
+          visible: bind template.selection-mode;
+        }
+
+        [start]
+        MenuButton {
+          icon-name: "list-add-symbolic";
+          tooltip-text: _("Add Torrent");
+          menu-model: add_menu;
+          visible: bind template.selection-mode inverted;
+        }
+
+        [end]
+        MenuButton {
+          icon-name: "open-menu-symbolic";
+          tooltip-text: _("Main Menu");
+          menu-model: primary_menu;
+          primary: true;
+        }
+
+        [end]
+        ToggleButton search_button {
+          icon-name: "edit-find-symbolic";
+          tooltip-text: _("Search");
+          active: bind search_bar.search-mode-enabled bidirectional;
+          visible: bind template.selection-mode inverted;
+        }
+      }
+
+      [top]
+      SearchBar search_bar {
+        key-capture-widget: template;
+
+        child: Adw.Clamp {
+          maximum-size: 400;
+
+          child: SearchEntry search_entry {
+            placeholder-text: _("Search torrents");
+            hexpand: true;
+            search-changed => $on_search_changed() swapped;
+          };
+        };
+      }
+
+      content: Stack content_stack {
+        transition-type: crossfade;
+
+        StackPage {
+          name: "empty";
+
+          child: Adw.StatusPage {
+            icon-name: "folder-download-symbolic";
+            title: _("No Torrents");
+            description: _("Add a magnet link or a .torrent file, or drop one on this window");
+          };
+        }
+
+        StackPage {
+          name: "no-results";
+
+          child: Adw.StatusPage {
+            icon-name: "edit-find-symbolic";
+            title: _("No Results");
+            description: _("No torrent name matches the search");
+          };
+        }
+
+        StackPage {
+          name: "list";
+
+          child: ScrolledWindow {
+            hscrollbar-policy: never;
+
+            child: Adw.Clamp {
+              maximum-size: 760;
+              margin-top: 24;
+              margin-bottom: 24;
+              margin-start: 12;
+              margin-end: 12;
+
+              child: Box {
+                orientation: vertical;
+                spacing: 12;
+
+                Label downloading_title {
+                  label: _("Downloading");
+                  halign: start;
+                  margin-start: 6;
+
+                  styles [
+                    "heading",
+                  ]
+                }
+
+                ListBox downloading_list {
+                  selection-mode: none;
+                  row-activated => $on_row_activated() swapped;
+
+                  styles [
+                    "boxed-list",
+                  ]
+                }
+
+                Label paused_title {
+                  label: _("Paused");
+                  halign: start;
+                  margin-start: 6;
+                  margin-top: 12;
+
+                  styles [
+                    "heading",
+                  ]
+                }
+
+                ListBox paused_list {
+                  selection-mode: none;
+                  row-activated => $on_row_activated() swapped;
+
+                  styles [
+                    "boxed-list",
+                  ]
+                }
+
+                Label finished_title {
+                  label: _("Finished");
+                  halign: start;
+                  margin-start: 6;
+                  margin-top: 12;
+
+                  styles [
+                    "heading",
+                  ]
+                }
+
+                ListBox finished_list {
+                  selection-mode: none;
+                  row-activated => $on_row_activated() swapped;
+
+                  styles [
+                    "boxed-list",
+                  ]
+                }
+              };
+            };
+          };
+        }
+      };
+
+      [bottom]
+      ActionBar {
+        revealed: bind template.selection-mode;
+
+        [start]
+        Button {
+          label: _("_Resume");
+          use-underline: true;
+          action-name: "win.resume-selected";
+        }
+
+        [start]
+        Button {
+          label: _("_Pause");
+          use-underline: true;
+          action-name: "win.pause-selected";
+        }
+
+        [end]
+        Button {
+          label: _("_Delete…");
+          use-underline: true;
+          action-name: "win.delete-selected";
+
+          styles [
+            "destructive-action",
+          ]
+        }
+      }
+    };
+  };
+}

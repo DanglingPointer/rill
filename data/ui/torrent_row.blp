@@ -1,0 +1,161 @@
+using Gtk 4.0;
+
+menu torrent_menu {
+  section {
+    item {
+      label: _("_Pause");
+      action: "row.pause";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("_Resume");
+      action: "row.resume";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("_Retry");
+      action: "row.retry";
+      hidden-when: "action-disabled";
+    }
+
+    item {
+      label: _("_Open Folder");
+      action: "row.open-folder";
+      hidden-when: "action-disabled";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Select");
+      action: "row.select";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Delete…");
+      action: "row.delete";
+    }
+  }
+}
+
+menu selection_menu {
+  section {
+    item {
+      label: _("Select _All");
+      action: "win.select-all";
+    }
+
+    item {
+      label: _("Select _None");
+      action: "win.select-none";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Resume");
+      action: "win.resume-selected";
+    }
+
+    item {
+      label: _("_Pause");
+      action: "win.pause-selected";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Delete…");
+      action: "win.delete-selected";
+    }
+  }
+}
+
+template $RillTorrentRow: ListBoxRow {
+  child: Box {
+    spacing: 12;
+    margin-top: 10;
+    margin-bottom: 10;
+    margin-start: 12;
+    margin-end: 8;
+
+    Image state_icon {
+      valign: center;
+
+      styles [
+        "torrent-icon",
+      ]
+    }
+
+    Box details {
+      orientation: vertical;
+      spacing: 2;
+      hexpand: true;
+      valign: center;
+
+      Label name_label {
+        xalign: 0;
+        ellipsize: end;
+        single-line-mode: true;
+
+        styles [
+          "heading",
+        ]
+      }
+
+      Label status_label {
+        xalign: 0;
+        ellipsize: end;
+        single-line-mode: true;
+
+        styles [
+          "caption",
+          "dim-label",
+        ]
+      }
+
+      ProgressBar progress_bar {
+        margin-top: 4;
+
+        styles [
+          "thin",
+        ]
+      }
+    }
+
+    Button action_button {
+      valign: center;
+      action-name: "row.primary";
+      visible: bind template.selection-mode inverted;
+
+      styles [
+        "circular",
+        "flat",
+      ]
+    }
+
+    CheckButton {
+      valign: center;
+      active: bind template.selected bidirectional;
+      visible: bind template.selection-mode;
+
+      accessibility {
+        labelled-by: name_label;
+      }
+    }
+  };
+
+  GestureClick {
+    button: 3;
+    pressed => $on_secondary_click() swapped;
+  }
+
+  GestureLongPress {
+    touch-only: true;
+    pressed => $on_long_press() swapped;
+  }
+}

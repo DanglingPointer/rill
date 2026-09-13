@@ -1,0 +1,46 @@
+[package]
+name = "rill"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-or-later"
+description = "A BitTorrent client for GNOME"
+repository = "https://github.com/sachesi/rill"
+readme = "README.md"
+
+[dependencies]
+mtorrent = "0.5"
+adw = { package = "libadwaita", version = "0.9", features = ["v1_8"] }
+gtk = { package = "gtk4", version = "0.11", features = ["v4_20"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time", "io-util", "net"] }
+async-channel = "2"
+log = "0.4"
+env_logger = "0.11"
+dirs-next = "2"
+urlencoding = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+sha1 = "0.10"
+ksni = { version = "0.3.4", default-features = false, features = ["blocking", "async-io"] }
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
+
+[build-dependencies]
+glib-build-tools = "0.22"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# mtorrent 0.5.2 has a `debug_assert!(false, "AvailabilityReporter overflow")` that fires
+# when the per-peer "Have" broadcast lags behind a fast download, and a debug-only panic
+# hook in `single_torrent` that turns any panic into `process::exit(1)`. Together they
+# end debug builds in the middle of a download. Turning debug assertions off for these
+# two crates compiles both out and leaves Rill's own assertions on.
+[profile.dev.package.mtorrent]
+debug-assertions = false
+
+[profile.dev.package.mtorrent-core]
+debug-assertions = false
+
+# Rill's fixes to mtorrent-core; see third_party/mtorrent-core/PATCHES.md.
+[patch.crates-io]
+mtorrent-core = { path = "third_party/mtorrent-core" }

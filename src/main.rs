@@ -1,0 +1,213 @@
+mod application;
+mod config;
+mod dialogs;
+mod engine;
+mod listener;
+mod logging;
+mod storage;
+mod torrent_paths;
+mod torrent_row;
+mod tray;
+mod util;
+mod window;
+
+use std::path::PathBuf;
+use std::rc::Rc;
+
+use adw::prelude::*;
+use gtk::{gio, glib};
+use mtorrent as mt;
+use mtorrent::utils::re_exports::mtorrent_utils::peer_id::PeerId;
+
+use crate::application::{RillApplication, Session};
+use crate::engine::TorrentEngine;
+use crate::storage::Storage;
+
+fn main() -> glib::ExitCode {
+    // SAFETY: the first thing the program does; no thread has been started.
+    unsafe { init_locale() };
+
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+        .filter_module("mtorrent::app::dht", log::LevelFilter::Warn)
+        .filter_module("mtorrent::app::main", log::LevelFilter::Warn)
+        .filter_module("mtorrent_core::utp", log::LevelFilter::Error)
+        // mtorrent logs routine peer churn (reset, interrupted, bad ack) as errors.
+        .filter_module("mtorrent_core::utp::handle", log::LevelFilter::Off)
+        .filter_module("mtorrent_core::utp::udp", log::LevelFilter::Off)
+        .init();
+
+    // The peer and storage runtimes run on detached threads; a panic there would
+    // otherwise only reach stderr, not the log.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("Thread panicked: {info}");
+        default_hook(info);
+    }));
+
+    gio::resources_register_include!("rill.gresource").expect("register resources");
+    glib::set_application_name("Rill");
+
+    // Registering claims the application id on the session bus before anything heavy
+    // happens. A second launch is then remote: run() hands its magnet link or file to
+    // the running instance and returns, without opening the database or the DHT port.
+    let app = RillApplication::new();
+    if let Err(e) = app.register(gio::Cancellable::NONE) {
+        log::error!("Failed to register the application: {e}");
+    }
+    if app.is_remote() {
+        log::info!("Rill is already running; passing this launch to it");
+        return app.run();
+    }
+
+    // mtorrent spawns DHT and engine tasks on the ambient runtime, so the process stays
+    // inside one for its whole life.
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("rill: could not start the Tokio runtime: {e}");
+            return glib::ExitCode::FAILURE;
+        }
+    };
+    let _guard = rt.enter();
+
+    match start_session() {
+        Ok(session) => app.set_session(session),
+        Err(e) => {
+            log::error!("{e}");
+            eprintln!("rill: {e}");
+            return glib::ExitCode::FAILURE;
+        }
+    }
+    // Exit without unwinding: dropping the runtimes would wait on transfers that are
+    // already paused and persisted by the shutdown handler.
+    std::process::exit(app.run().into())
+}
+
+/// Opens the database and starts the engine: the runtimes mtorrent needs, the DHT node,
+/// and the torrents saved from the last session.
+fn start_session() -> Result<Session, String> {
+    let data_dir = dirs_next::data_local_dir()
+        .or_else(dirs_next::data_dir)
+        .ok_or("No data directory; is HOME set?")?
+        .join("rill");
+    std::fs::create_dir_all(&data_dir)
+        .map_err(|e| format!("Could not create {}: {e}", data_dir.display()))?;
+    log::info!("Data directory: {}", data_dir.display());
+
+    let db_path = data_dir.join("torrents.db");
+    let storage = Storage::open(db_path.clone())
+        .map_err(|e| format!("Could not open the database {}: {e}", db_path.display()))?;
+    logging::apply_settings(&storage.load_settings());
+
+    // Peer connections and disk storage each want a current-thread runtime of their own
+    // (they use spawn_local). The builders are Send, the runtimes are not, so each is
+    // built on the thread that drives it.
+    let pwp_handle = spawn_local_runtime("pwp-runtime")?;
+    let storage_handle = spawn_local_runtime("storage-runtime")?;
+
+    let (dht_worker, dht_cmds) = mt::app::dht::launch_dht_node_runtime(mt::app::dht::Config {
+        local_port: 6881,
+        max_concurrent_queries: Some(10),
+        config_dir: data_dir.clone(),
+        use_upnp: false,
+        bootstrap_nodes_override: None,
+        bind_interface: None,
+        query_timeout: None,
+    })
+    .map_err(|e| format!("Could not start the DHT node: {e}"))?;
+
+    let engine = Rc::new(TorrentEngine::new(
+        PeerId::generate_new(),
+        data_dir,
+        pwp_handle,
+        storage_handle,
+        dht_cmds,
+        storage.clone(),
+    ));
+
+    let mut saved = storage.load_torrents().unwrap_or_else(|e| {
+        log::warn!("Failed to load torrents: {e}");
+        Vec::new()
+    });
+    rekey_legacy_records(&storage, &mut saved);
+    log::info!("Loaded {} saved torrents", saved.len());
+
+    Ok(Session {
+        _dht_worker: dht_worker,
+        engine,
+        storage,
+        saved: saved.into(),
+    })
+}
+
+fn spawn_local_runtime(name: &str) -> Result<tokio::runtime::Handle, String> {
+    let mut builder = tokio::runtime::Builder::new_current_thread();
+    builder.enable_all();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name(name.into())
+        .spawn(move || match builder.build_local(Default::default()) {
+            Ok(rt) => {
+                tx.send(Ok(rt.handle().clone())).ok();
+                rt.block_on(std::future::pending::<()>());
+            }
+            Err(e) => {
+                tx.send(Err(e.to_string())).ok();
+            }
+        })
+        .map_err(|e| format!("Could not start {name}: {e}"))?;
+    rx.recv()
+        .map_err(|_| format!("{name} exited during startup"))?
+        .map_err(|e| format!("{name}: {e}"))
+}
+
+/// Records saved before torrents were keyed by their info hash used a hash of the URI
+/// text. Re-key them so the engine finds the same rows; a record whose info hash is
+/// already taken keeps its old key.
+fn rekey_legacy_records(storage: &Storage, saved: &mut [storage::SavedTorrent]) {
+    for torrent in saved {
+        let canonical = engine::torrent_id(&torrent.uri);
+        if canonical == torrent.info_hash {
+            continue;
+        }
+        match storage.migrate_torrent_hash(&torrent.info_hash, &canonical) {
+            Ok(true) => {
+                log::info!(
+                    "Re-keyed torrent {} -> {} ({})",
+                    torrent.info_hash,
+                    canonical,
+                    torrent.name
+                );
+                torrent.info_hash = canonical;
+            }
+            Ok(false) => log::warn!(
+                "Torrent {} keeps its old id {}; its info hash is already in use",
+                torrent.name,
+                torrent.info_hash
+            ),
+            Err(e) => log::warn!("Failed to re-key {}: {e}", torrent.name),
+        }
+    }
+}
+
+/// Binds the text domain: the catalogues compiled into the build directory for a debug
+/// build run from the source tree, the installed ones otherwise.
+///
+/// # Safety
+///
+/// Sets the locale, which reads the environment: call it before any thread is started.
+unsafe fn init_locale() {
+    use gettextrs::{
+        LocaleCategory, bind_textdomain_codeset, bindtextdomain, setlocale, textdomain,
+    };
+
+    // SAFETY: the caller has started no thread yet.
+    unsafe { setlocale(LocaleCategory::LcAll, "") };
+    let dir = match option_env!("RILL_BUILD_LOCALEDIR") {
+        Some(dir) if cfg!(debug_assertions) && std::path::Path::new(dir).is_dir() => dir,
+        _ => config::LOCALEDIR,
+    };
+    bindtextdomain(config::GETTEXT_PACKAGE, PathBuf::from(dir)).ok();
+    bind_textdomain_codeset(config::GETTEXT_PACKAGE, "UTF-8").ok();
+    textdomain(config::GETTEXT_PACKAGE).ok();
+}
