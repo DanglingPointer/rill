@@ -12,8 +12,7 @@ begins with a line saying so.
   Rill's "Sequential Download" switch does. The tracker keeps its per-piece owners in a
   vector indexed by piece to make that ordering cheap.
 - `src/data/storage.rs`: file paths from a torrent that are absolute or contain `..` are
-  refused before anything is created; the storage server runs its blocking file I/O on
-  `spawn_blocking` rather than on the async runtime's thread.
+  refused before anything is created.
 - `src/input/metainfo.rs`: path components `.`, `..`, and any containing `/` or `\` are
   dropped from a torrent's file list, and a file left with an empty path is ignored.
 - `src/trackers/url.rs`: trackers on link-local, unspecified or broadcast IP addresses

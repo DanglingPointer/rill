@@ -18,6 +18,8 @@ use crate::window::RillWindow;
 pub struct Session {
     /// Owns the DHT thread; dropping it stops the node.
     pub _dht_worker: worker::rt::Handle,
+    /// Runs the torrents' disk storage; dropping it stops that.
+    pub _storage_runtime: tokio::runtime::Runtime,
     pub engine: Rc<TorrentEngine>,
     pub storage: Storage,
     /// Torrents from the database, handed to the first window.

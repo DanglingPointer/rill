@@ -195,13 +195,11 @@ struct GenericStorageServer<F: RandomAccessReadWrite> {
     storage: GenericStorage<F>,
 }
 
-impl<F: RandomAccessReadWrite + Send + 'static> GenericStorageServer<F> {
+impl<F: RandomAccessReadWrite> GenericStorageServer<F> {
     async fn run(mut self) {
-        let _ = tokio::task::spawn_blocking(move || {
-            while let Some(cmd) = self.channel.blocking_recv() {
-                self.handle_cmd(cmd);
-            }
-        }).await;
+        while let Some(cmd) = self.channel.recv().await {
+            self.handle_cmd(cmd);
+        }
     }
 
     fn handle_cmd(&self, cmd: Command) {

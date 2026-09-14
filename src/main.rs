@@ -99,11 +99,11 @@ fn start_session() -> Result<Session, String> {
         .map_err(|e| format!("Could not open the database {}: {e}", db_path.display()))?;
     logging::apply_settings(&storage.load_settings());
 
-    // Peer connections and disk storage each want a current-thread runtime of their own
-    // (they use spawn_local). The builders are Send, the runtimes are not, so each is
-    // built on the thread that drives it.
+    // Peer connections want a current-thread runtime of their own (they use spawn_local).
+    // The builder is Send, the runtime is not, so it is built on the thread that drives it.
     let pwp_handle = spawn_local_runtime("pwp-runtime")?;
-    let storage_handle = spawn_local_runtime("storage-runtime")?;
+    let storage_runtime =
+        storage_runtime().map_err(|e| format!("Could not start storage-runtime: {e}"))?;
 
     let (dht_worker, dht_cmds) = mt::app::dht::launch_dht_node_runtime(mt::app::dht::Config {
         local_port: 6881,
@@ -120,7 +120,7 @@ fn start_session() -> Result<Session, String> {
         PeerId::generate_new(),
         data_dir,
         pwp_handle,
-        storage_handle,
+        storage_runtime.handle().clone(),
         dht_cmds,
         storage.clone(),
     ));
@@ -134,10 +134,24 @@ fn start_session() -> Result<Session, String> {
 
     Ok(Session {
         _dht_worker: dht_worker,
+        _storage_runtime: storage_runtime,
         engine,
         storage,
         saved: saved.into(),
     })
+}
+
+/// Threads of the storage runtime: enough for the default three active downloads.
+const STORAGE_THREADS: usize = 4;
+
+/// The runtime torrents store their data on. mtorrent reads and writes each torrent's files
+/// synchronously on it, so it has threads to spare: one torrent's disk must not hold up another.
+fn storage_runtime() -> std::io::Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(STORAGE_THREADS)
+        .thread_name("storage-runtime")
+        .enable_all()
+        .build()
 }
 
 fn spawn_local_runtime(name: &str) -> Result<tokio::runtime::Handle, String> {
@@ -210,4 +224,39 @@ unsafe fn init_locale() {
     bindtextdomain(config::GETTEXT_PACKAGE, PathBuf::from(dir)).ok();
     bind_textdomain_codeset(config::GETTEXT_PACKAGE, "UTF-8").ok();
     textdomain(config::GETTEXT_PACKAGE).ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn storage_of_one_torrent_does_not_wait_for_another() {
+        let runtime = storage_runtime().unwrap();
+        // Stands in for a storage server busy with a slow disk.
+        runtime.spawn(async { std::thread::sleep(Duration::from_secs(2)) });
+        let (tx, rx) = std::sync::mpsc::channel();
+        runtime.spawn(async move { tx.send(()).unwrap() });
+        assert!(rx.recv_timeout(Duration::from_secs(1)).is_ok());
+        runtime.shutdown_background();
+    }
+
+    #[test]
+    fn torrent_data_is_written_and_read_on_the_storage_runtime() {
+        use mtorrent::utils::re_exports::mtorrent_core::data::new_async_storage;
+
+        let dir = std::env::temp_dir().join(format!("rill-storage-{}", std::process::id()));
+        let runtime = storage_runtime().unwrap();
+        let (client, server) =
+            new_async_storage(&dir, std::iter::once((4, PathBuf::from("file")))).unwrap();
+        runtime.spawn(server.run());
+        let data = runtime.block_on(async {
+            client.write_block(0, vec![1, 2, 3, 4]).await.unwrap();
+            client.read_block(0, 4).await.unwrap()
+        });
+        runtime.shutdown_background();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(data, [1, 2, 3, 4]);
+    }
 }
