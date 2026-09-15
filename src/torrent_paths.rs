@@ -20,6 +20,19 @@ pub fn content_path(uri: &str, output_dir: &Path) -> Option<PathBuf> {
         .and_then(|stem| contained_path(output_dir, stem))
 }
 
+/// The .torrent file of a torrent: the one it was added from, or for a magnet link the one
+/// mtorrent saves in `output_dir` once it has fetched the metadata, named like the content.
+pub fn metainfo_path(uri: &str, output_dir: &Path) -> Option<PathBuf> {
+    use std::str::FromStr;
+
+    let sanitized = crate::engine::sanitize_magnet_dn(uri);
+    if let Ok(magnet) = MagnetLink::from_str(&sanitized) {
+        let name = magnet.name().unwrap_or("unnamed");
+        return contained_path(output_dir, &format!("{name}.torrent"));
+    }
+    Some(PathBuf::from(uri))
+}
+
 /// `output_dir/name`, provided `name` is one plain path component: a name taken from a
 /// torrent must not reach outside the download folder.
 pub fn contained_path(output_dir: &Path, name: &str) -> Option<PathBuf> {
@@ -70,6 +83,21 @@ mod tests {
         assert_eq!(
             content_path(uri, output_dir),
             Some(output_dir.join("Show _ Season 1"))
+        );
+    }
+
+    #[test]
+    fn metainfo_path_of_a_magnet_is_beside_its_content() {
+        let output_dir = Path::new("/tmp/rill-downloads");
+        let uri = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Show%20%2F%20Season%201";
+
+        assert_eq!(
+            metainfo_path(uri, output_dir),
+            Some(output_dir.join("Show _ Season 1.torrent"))
+        );
+        assert_eq!(
+            metainfo_path("/tmp/source/Foo.torrent", output_dir),
+            Some(PathBuf::from("/tmp/source/Foo.torrent"))
         );
     }
 

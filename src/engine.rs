@@ -252,14 +252,9 @@ impl TorrentEngine {
             // Re-add with a possibly-changed sequential flag: notify the UI so the
             // displayed setting does not go stale. Zeroed counters are backfilled
             // from the previous update by the UI's coalescing logic.
-            let _ = ui_tx.try_send(UiEvent::Update(UiUpdate::idle(
-                info_hash.clone(),
-                name,
-                TorrentUiState::Downloading,
-                output_dir,
-                uri,
-                sequential,
-            )));
+            let _ = ui_tx.try_send(UiEvent::Update(
+                existing.idle_update(&info_hash, TorrentUiState::Downloading),
+            ));
             return info_hash;
         }
 
@@ -298,20 +293,14 @@ impl TorrentEngine {
         sequential: bool,
         ui_tx: Sender<UiEvent>,
     ) -> String {
-        let update_name = name.clone();
-        let update_uri = uri.clone();
-        let update_dir = output_dir.clone();
         let info_hash = self.add_paused_silent(name, uri, output_dir, sequential, ui_tx.clone());
         // Notify the UI of the new paused torrent, or of the (possibly changed)
         // sequential flag on re-add.
-        let _ = ui_tx.try_send(UiEvent::Update(UiUpdate::idle(
-            info_hash.clone(),
-            update_name,
-            TorrentUiState::Paused,
-            update_dir,
-            update_uri,
-            sequential,
-        )));
+        if let Some(torrent) = lock_recover(&self.saved, "saved map").get(&info_hash) {
+            let _ = ui_tx.try_send(UiEvent::Update(
+                torrent.idle_update(&info_hash, TorrentUiState::Paused),
+            ));
+        }
         info_hash
     }
 
@@ -400,6 +389,16 @@ impl TorrentEngine {
         }
         drop(active);
         lock_recover(&self.saved, "saved map").remove(info_hash);
+    }
+
+    /// Gives a torrent the name it has learnt from its metadata, for the snapshots of its
+    /// next run.
+    pub fn rename(&self, info_hash: &str, name: &str) {
+        for map in [&self.active, &self.saved] {
+            if let Some(torrent) = lock_recover(map, "torrent map").get_mut(info_hash) {
+                torrent.name = name.to_string();
+            }
+        }
     }
 
     /// Sets the sequential download flag for a torrent.
@@ -558,9 +557,11 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
         let update = UiUpdate {
             downloaded: *lock_recover(&downloaded_bytes, "downloaded bytes"),
             total: *lock_recover(&total_bytes, "total bytes"),
+            // No name: the one the window has may be newer than the one this run began
+            // with.
             ..UiUpdate::idle(
                 info_hash,
-                name,
+                String::new(),
                 TorrentUiState::Paused,
                 output_dir,
                 uri,

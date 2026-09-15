@@ -29,6 +29,7 @@ pub struct GtkListener {
     downloaded_pieces: usize,
     sequential: Arc<std::sync::atomic::AtomicBool>,
     info_hash_resolved: bool,
+    name_resolved: bool,
     /// Directory holding the persisted `.mtorrent` piece-state file and the real
     /// 20-byte info hash keying it. Resolved once from the URI + output dir.
     state_target: Option<(PathBuf, [u8; 20])>,
@@ -67,6 +68,7 @@ impl GtkListener {
             downloaded_pieces: 0,
             sequential,
             info_hash_resolved: false,
+            name_resolved: false,
             state_target: None,
             last_piece_map: None,
         }
@@ -145,20 +147,16 @@ fn build_piece_map(
     out
 }
 
-/// Resolves the display name from the torrent metadata when the URI points at a
-/// `.torrent` file. Magnet links return `None` (the caller already extracted the
-/// `dn` parameter; the real name only arrives once metadata is downloaded).
-fn resolve_real_name(uri: &str) -> Option<String> {
-    use mtorrent::utils::re_exports::mtorrent_core::input::{MagnetLink, Metainfo};
-    use std::str::FromStr;
+/// The name the torrent's metadata gives it: from the .torrent file it was added from, or
+/// for a magnet link from the one mtorrent saved once it fetched the metadata.
+fn metainfo_name(uri: &str, output_dir: &std::path::Path) -> Option<String> {
+    use mtorrent::utils::re_exports::mtorrent_core::input::Metainfo;
 
-    if MagnetLink::from_str(uri).is_ok() {
-        return None;
-    }
-    if let Ok(meta) = Metainfo::from_file(std::path::Path::new(uri)) {
-        return meta.name().map(|s| s.to_string());
-    }
-    None
+    let path = crate::torrent_paths::metainfo_path(uri, output_dir)?;
+    let meta = Metainfo::from_file(path).ok()?;
+    meta.name()
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
 }
 
 impl StateListener for GtkListener {
@@ -172,13 +170,16 @@ impl StateListener for GtkListener {
         self.downloaded_pieces = downloaded_pieces;
 
         if !self.info_hash_resolved {
-            // Override the filename-stem name with the real name from the
-            // .torrent metadata's info.name field when available.
-            if let Some(name) = resolve_real_name(&self.uri).filter(|n| !n.is_empty()) {
-                self.name = name;
-            }
             self.state_target = resolve_state_target(&self.uri, &self.output_dir);
             self.info_hash_resolved = true;
+        }
+        // Pieces are known once the metadata is: from then on the torrent has its own
+        // name, which replaces a file stem or a magnet link's `dn`.
+        if !self.name_resolved && total_pieces > 0 {
+            if let Some(name) = metainfo_name(&self.uri, &self.output_dir) {
+                self.name = name;
+            }
+            self.name_resolved = true;
         }
 
         if self.cancel_flag.load(std::sync::atomic::Ordering::Acquire)
@@ -291,5 +292,24 @@ impl StateListener for GtkListener {
             piece_map,
         }));
         ControlFlow::Continue(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_magnet_link_takes_the_name_of_its_fetched_metadata() {
+        let dir = std::env::temp_dir().join(format!("rill-listener-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let uri = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=link%20name";
+        assert_eq!(metainfo_name(uri, &dir), None);
+
+        let metainfo = b"d4:infod6:lengthi1e4:name9:real name12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaaee";
+        std::fs::write(dir.join("link name.torrent"), metainfo).unwrap();
+        let name = metainfo_name(uri, &dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(name.as_deref(), Some("real name"));
     }
 }

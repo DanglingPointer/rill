@@ -312,6 +312,15 @@ impl Database {
         Ok(())
     }
 
+    /// Rename a torrent
+    pub fn update_torrent_name(&self, info_hash: &str, name: &str) -> SqlResult<()> {
+        self.conn.execute(
+            "UPDATE torrents SET name = ?1 WHERE info_hash = ?2",
+            rusqlite::params![name, info_hash],
+        )?;
+        Ok(())
+    }
+
     /// Update torrent sequential flag
     pub fn update_torrent_sequential(&self, info_hash: &str, sequential: bool) -> SqlResult<()> {
         log::debug!(

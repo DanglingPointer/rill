@@ -745,10 +745,14 @@ impl RillWindow {
         }
 
         let existing = imp.rows.borrow().get(&update.info_hash).cloned();
+        let previous = existing.as_ref().and_then(TorrentRow::latest);
         let mut update = update.clone();
         // Snapshots taken before the metadata arrived, and those the engine makes up
-        // itself, carry no sizes: keep the last known ones.
-        if let Some(previous) = existing.as_ref().and_then(TorrentRow::latest) {
+        // itself, carry no sizes, and the engine's no name: keep the last known ones.
+        if let Some(previous) = &previous {
+            if update.name.is_empty() {
+                update.name = previous.name.clone();
+            }
             if update.total == 0 {
                 update.total = previous.total;
                 update.downloaded = previous.downloaded;
@@ -768,6 +772,9 @@ impl RillWindow {
         };
         let old_state = row.state();
         row.update(&update);
+        if previous.is_some_and(|previous| previous.name != update.name) {
+            self.rename(&update.info_hash, &update.name);
+        }
         if let Some(dialog) = imp.info_dialogs.borrow().get(&update.info_hash) {
             dialog.apply_update(&update);
         }
@@ -781,6 +788,17 @@ impl RillWindow {
             self.update_sections();
             self.check_queue();
         }
+    }
+
+    /// Keeps the name a torrent's metadata gave it, for its next run and the next session.
+    fn rename(&self, hash: &str, name: &str) {
+        self.engine().rename(hash, name);
+        let (key, name) = (hash.to_string(), name.to_string());
+        self.storage().execute(move |s| {
+            if let Err(e) = s.update_torrent_name(&key, &name) {
+                log::warn!("Failed to save the name of {key}: {e}");
+            }
+        });
     }
 
     /// Saves a torrent seen for the first time and makes its row.

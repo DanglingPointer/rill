@@ -183,6 +183,13 @@ impl Storage {
             .map_err(|e| format!("Failed to migrate torrent hash: {}", e))
     }
 
+    /// Rename a torrent
+    pub fn update_torrent_name(&self, info_hash: &str, name: &str) -> Result<(), String> {
+        self.db()
+            .update_torrent_name(info_hash, name)
+            .map_err(|e| format!("Failed to rename torrent: {}", e))
+    }
+
     /// Update torrent sequential flag
     pub fn update_torrent_sequential(
         &self,
