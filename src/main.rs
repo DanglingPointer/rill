@@ -106,7 +106,7 @@ fn start_session() -> Result<Session, String> {
         storage_runtime().map_err(|e| format!("Could not start storage-runtime: {e}"))?;
 
     let (dht_worker, dht_cmds) = mt::app::dht::launch_dht_node_runtime(mt::app::dht::Config {
-        local_port: 6881,
+        local_port: dht_port(),
         max_concurrent_queries: Some(10),
         config_dir: data_dir.clone(),
         use_upnp: false,
@@ -139,6 +139,31 @@ fn start_session() -> Result<Session, String> {
         storage,
         saved: saved.into(),
     })
+}
+
+/// The UDP port for the DHT node: the usual 6881, or the next free one when another client
+/// holds it. mtorrent only logs a port it cannot bind and runs without the DHT.
+fn dht_port() -> u16 {
+    const USUAL: u16 = 6881;
+    let port = free_udp_port(USUAL..=USUAL + 8);
+    match port {
+        USUAL => {}
+        0 => log::warn!(
+            "UDP ports {USUAL} to {} are in use; the DHT takes any free port",
+            USUAL + 8
+        ),
+        port => log::warn!("UDP port {USUAL} is in use; the DHT takes port {port}"),
+    }
+    port
+}
+
+/// The first of `ports` that a UDP socket can bind, or 0, which leaves the choice to the
+/// system.
+fn free_udp_port(ports: impl IntoIterator<Item = u16>) -> u16 {
+    ports
+        .into_iter()
+        .find(|&port| std::net::UdpSocket::bind((std::net::Ipv4Addr::UNSPECIFIED, port)).is_ok())
+        .unwrap_or(0)
 }
 
 /// Threads of the storage runtime: enough for the default three active downloads.
@@ -230,6 +255,20 @@ unsafe fn init_locale() {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn dht_port_skips_ports_in_use() {
+        let held = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+        let taken = held.local_addr().unwrap().port();
+        let free = std::net::UdpSocket::bind("0.0.0.0:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+
+        assert_eq!(free_udp_port([taken, free]), free);
+        assert_eq!(free_udp_port([taken]), 0);
+    }
 
     #[test]
     fn storage_of_one_torrent_does_not_wait_for_another() {
