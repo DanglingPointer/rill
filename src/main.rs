@@ -7,6 +7,7 @@ mod logging;
 mod storage;
 mod torrent_paths;
 mod torrent_row;
+mod torrents;
 mod tray;
 mod util;
 mod window;

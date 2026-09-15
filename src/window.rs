@@ -2,7 +2,7 @@
 //! `win.*` actions through which the rows, the dialogs and the tray reach the engine.
 
 use std::cell::{Cell, OnceCell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -17,11 +17,8 @@ use crate::engine::{TorrentEngine, TorrentUiState, UiEvent, UiUpdate};
 use crate::storage::{SavedTorrent, Storage};
 use crate::torrent_paths;
 use crate::torrent_row::TorrentRow;
+use crate::torrents::{Torrents, state_key};
 use crate::tray;
-
-/// What the database last received for a torrent: state, downloaded, total, total
-/// pieces, downloaded pieces.
-type PersistedSnapshot = (&'static str, u64, u64, u64, u64);
 
 mod imp {
     use super::*;
@@ -63,15 +60,10 @@ mod imp {
         pub tx: OnceCell<Sender<UiEvent>>,
         pub rows: RefCell<HashMap<String, TorrentRow>>,
         pub info_dialogs: RefCell<HashMap<String, TorrentInfoDialog>>,
-        /// Skips database writes for snapshots that change nothing it stores.
-        pub last_persisted: RefCell<HashMap<String, PersistedSnapshot>>,
-        /// Deleted torrents, whose late updates are dropped.
-        pub deleted: RefCell<HashSet<String>>,
-        /// Torrents the user paused. The download queue never resumes these.
-        pub user_paused: RefCell<HashSet<String>>,
-        /// Torrents the download queue paused. They are stored as downloading, so they
-        /// resume when a slot frees up, after a restart too.
-        pub auto_paused: RefCell<HashSet<String>>,
+        /// What there is to know about the torrents of the rows, the queue included.
+        pub torrents: RefCell<Torrents>,
+        /// How many downloads may run at once.
+        pub download_limit: Cell<usize>,
         /// Whether the notice that Rill keeps running in the tray has been sent.
         pub background_notice_sent: Cell<bool>,
         pub queue_check_pending: Cell<bool>,
@@ -261,6 +253,8 @@ impl RillWindow {
         let (tx, rx) = async_channel::unbounded();
 
         let settings = storage.load_settings();
+        imp.download_limit
+            .set(settings.max_active_downloads.max(1) as usize);
         window.set_default_size(settings.window_width, settings.window_height);
         if settings.window_maximized {
             window.maximize();
@@ -321,7 +315,7 @@ impl RillWindow {
                 .add_paused(name, uri, dir, sequential, self.sender())
         };
         // A torrent deleted earlier in this session may come back.
-        self.imp().deleted.borrow_mut().remove(&hash);
+        self.imp().torrents.borrow_mut().undelete(&hash);
     }
 
     /// Where Rill keeps its database and copies of .torrent files.
@@ -488,8 +482,7 @@ impl RillWindow {
         if row.state() != TorrentUiState::Downloading {
             return;
         }
-        imp.user_paused.borrow_mut().insert(hash.to_string());
-        imp.auto_paused.borrow_mut().remove(hash);
+        imp.torrents.borrow_mut().leave_queue(hash);
         if let Some(mut update) = row.latest() {
             update.state = TorrentUiState::Paused;
             update.speed_down = 0;
@@ -508,8 +501,7 @@ impl RillWindow {
         if !matches!(row.state(), TorrentUiState::Paused | TorrentUiState::Error) {
             return;
         }
-        imp.user_paused.borrow_mut().remove(hash);
-        imp.auto_paused.borrow_mut().remove(hash);
+        imp.torrents.borrow_mut().leave_queue(hash);
         if let Some(mut update) = row.latest() {
             update.state = TorrentUiState::Downloading;
             self.process_update(&update);
@@ -577,10 +569,7 @@ impl RillWindow {
 
     fn delete_torrent(&self, hash: &str, delete_data: bool) {
         let imp = self.imp();
-        imp.deleted.borrow_mut().insert(hash.to_string());
-        imp.user_paused.borrow_mut().remove(hash);
-        imp.auto_paused.borrow_mut().remove(hash);
-        imp.last_persisted.borrow_mut().remove(hash);
+        imp.torrents.borrow_mut().delete(hash);
         let dialog = imp.info_dialogs.borrow_mut().remove(hash);
         if let Some(dialog) = dialog {
             dialog.close();
@@ -740,7 +729,7 @@ impl RillWindow {
 
     fn process_update(&self, update: &UiUpdate) {
         let imp = self.imp();
-        if imp.deleted.borrow().contains(&update.info_hash) {
+        if imp.torrents.borrow().is_deleted(&update.info_hash) {
             return;
         }
 
@@ -772,6 +761,9 @@ impl RillWindow {
         };
         let old_state = row.state();
         row.update(&update);
+        imp.torrents
+            .borrow_mut()
+            .set_state(&update.info_hash, update.state);
         if previous.is_some_and(|previous| previous.name != update.name) {
             self.rename(&update.info_hash, &update.name);
         }
@@ -815,14 +807,17 @@ impl RillWindow {
         record.total_pieces = update.total_pieces as u64;
         record.downloaded_pieces = update.downloaded_pieces as u64;
         record.sequential = update.sequential;
-        // Written at once rather than queued: the queue check and a restart must both
-        // find the new torrent in the database.
+        // Written at once rather than queued: a torrent that cannot be saved is not kept.
         if let Err(e) = self.storage().save_torrent(&record) {
             log::warn!("Failed to save new torrent: {e}");
             self.engine().stop(&update.info_hash);
             self.show_toast(&gettext("Could not save the torrent: %s").replace("%s", &e));
             return None;
         }
+        self.imp()
+            .torrents
+            .borrow_mut()
+            .add(&update.info_hash, update.state, record.added_at);
         Some(self.make_row(&update.info_hash))
     }
 
@@ -891,11 +886,11 @@ impl RillWindow {
     fn restore_torrents(&self, saved: Vec<SavedTorrent>) {
         let tx = self.sender();
         for torrent in saved {
-            let state = match torrent.state.as_str() {
-                "completed" => TorrentUiState::Completed,
-                "error" => TorrentUiState::Error,
-                _ => TorrentUiState::Paused,
-            };
+            let state = self.imp().torrents.borrow_mut().restore(
+                &torrent.info_hash,
+                &torrent.state,
+                torrent.added_at,
+            );
             let update = UiUpdate {
                 downloaded: torrent.downloaded,
                 total: torrent.total,
@@ -929,14 +924,11 @@ impl RillWindow {
     }
 
     fn persist(&self, update: &UiUpdate) {
-        let state = if update.state == TorrentUiState::Paused
-            && self.imp().auto_paused.borrow().contains(&update.info_hash)
-        {
-            // Paused by the queue, not by the user: resume when a slot frees up.
-            "downloading"
-        } else {
-            state_key(update.state)
-        };
+        let imp = self.imp();
+        let state = imp
+            .torrents
+            .borrow()
+            .stored_state(&update.info_hash, update.state);
         let snapshot = (
             state,
             update.downloaded,
@@ -944,13 +936,13 @@ impl RillWindow {
             update.total_pieces as u64,
             update.downloaded_pieces as u64,
         );
-        let imp = self.imp();
-        if imp.last_persisted.borrow().get(&update.info_hash) == Some(&snapshot) {
+        if !imp
+            .torrents
+            .borrow_mut()
+            .record_snapshot(&update.info_hash, snapshot)
+        {
             return;
         }
-        imp.last_persisted
-            .borrow_mut()
-            .insert(update.info_hash.clone(), snapshot);
 
         let storage = self.storage().clone();
         let hash = update.info_hash.clone();
@@ -976,10 +968,11 @@ impl RillWindow {
                 if let Err(e) = result {
                     log::warn!("Failed to save the state of {hash}: {e}");
                     // Forget it, so that the next identical snapshot tries again.
-                    let mut persisted = window.imp().last_persisted.borrow_mut();
-                    if persisted.get(&hash) == Some(&snapshot) {
-                        persisted.remove(&hash);
-                    }
+                    window
+                        .imp()
+                        .torrents
+                        .borrow_mut()
+                        .snapshot_failed(&hash, snapshot);
                 }
             }
         ));
@@ -1004,61 +997,34 @@ impl RillWindow {
         );
     }
 
+    /// Sets how many downloads may run at once, and applies it.
+    pub fn set_download_limit(&self, limit: usize) {
+        self.imp().download_limit.set(limit.max(1));
+        self.check_queue();
+    }
+
     /// Pauses the newest downloads above the limit, or starts the oldest waiting ones
     /// while there is room. A torrent the user paused is never started.
     fn run_queue(&self) {
         let imp = self.imp();
-        // Read synchronously: a torrent added a moment ago must be in the snapshot.
-        let (settings, saved) = self.storage().load_settings_and_torrents();
-        let limit = settings.max_active_downloads.max(1) as usize;
+        let limit = imp.download_limit.get();
         let engine = self.engine();
-        let rows = imp.rows.borrow();
-
-        let mut active: Vec<(&str, i64)> = Vec::new();
-        let mut waiting: Vec<(&str, i64)> = Vec::new();
-        for torrent in &saved {
-            let hash = torrent.info_hash.as_str();
-            if torrent.state == "completed" || !rows.contains_key(hash) {
-                continue;
-            }
-            if engine.is_active(hash) {
-                active.push((hash, torrent.added_at));
-            } else if !imp.user_paused.borrow().contains(hash)
-                && (torrent.state == "downloading" || imp.auto_paused.borrow().contains(hash))
-            {
-                waiting.push((hash, torrent.added_at));
-            }
-        }
-
-        if active.len() > limit {
-            active.sort_by_key(|&(_, added)| std::cmp::Reverse(added));
-            let excess = active.len() - limit;
+        let plan = imp
+            .torrents
+            .borrow_mut()
+            .plan_queue(limit, |hash| engine.is_active(hash));
+        if !plan.pause.is_empty() {
             log::info!(
-                "{} downloads over the limit of {limit}; pausing {excess}",
-                active.len()
+                "Downloads over the limit of {limit}; pausing {}",
+                plan.pause.len()
             );
-            for &(hash, _) in active.iter().take(excess) {
-                imp.auto_paused.borrow_mut().insert(hash.to_string());
-                engine.toggle(hash);
-            }
-        } else if active.len() < limit && !waiting.is_empty() {
-            waiting.sort_by_key(|&(_, added)| added);
-            let room = limit - active.len();
-            for &(hash, _) in waiting.iter().take(room) {
-                log::info!("Starting queued torrent {hash}");
-                imp.auto_paused.borrow_mut().remove(hash);
-                engine.toggle(hash);
-            }
         }
-    }
-}
-
-/// How the database spells a state.
-fn state_key(state: TorrentUiState) -> &'static str {
-    match state {
-        TorrentUiState::Downloading => "downloading",
-        TorrentUiState::Paused => "paused",
-        TorrentUiState::Completed => "completed",
-        TorrentUiState::Error => "error",
+        for hash in &plan.pause {
+            engine.toggle(hash);
+        }
+        for hash in &plan.start {
+            log::info!("Starting queued torrent {hash}");
+            engine.toggle(hash);
+        }
     }
 }

@@ -62,7 +62,7 @@ mod imp {
             let obj = self.obj();
             obj.save(|s| s.max_active_downloads = value);
             if let Some(window) = self.window.upgrade() {
-                window.check_queue();
+                window.set_download_limit(value.max(1) as usize);
             }
         }
 

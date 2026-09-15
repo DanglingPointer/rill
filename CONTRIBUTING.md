@@ -25,8 +25,9 @@ Before a change goes in:
                              runtimes mtorrent needs and the DHT node
     src/application.rs       AdwApplication subclass: app actions, opening files and links,
                              the tray's commands, pausing everything on shutdown
-    src/window.rs            the list, search, selection mode, the download queue, and the
-                             win.* actions the rows and dialogs go through
+    src/window.rs            the list, search, selection mode, and the win.* actions the
+                             rows and dialogs go through
+    src/torrents.rs          what the window knows of each torrent, and the download queue
     src/torrent_row.rs       one row: its state, its button and its context menu
     src/dialogs/             add, details (with the Files page's list item) and preferences
     src/engine.rs            starts, pauses and stops mtorrent tasks on a thread of its own
@@ -43,11 +44,11 @@ rows do not talk to the engine: their actions activate `win.pause-torrent`,
 `win.resume-torrent` and `win.delete-torrent` with the torrent's info hash, and the window
 does the rest.
 
-mtorrent runs on Tokio, so the process lives inside a Tokio runtime and has two more
-current-thread runtimes for peers and disk storage, plus the engine's own thread. Updates
-reach the GTK main context through an `async-channel`. Database writes on the paths the
-interface takes often are queued to the storage worker; reads that must see the latest
-state, like the queue check, are synchronous.
+mtorrent runs on Tokio, so the process lives inside a Tokio runtime and has two more: a
+current-thread one for peers and a multi-threaded one for disk storage, plus the engine's
+own thread. Updates reach the GTK main context through an `async-channel`. Database writes
+on the paths the interface takes often are queued to the storage worker; the queue decides
+from what the window keeps in memory and reads nothing.
 
 ## Running
 
