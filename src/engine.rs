@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_channel::Sender;
@@ -42,6 +43,36 @@ pub struct UiUpdate {
     pub piece_map: Vec<u8>,
 }
 
+impl UiUpdate {
+    /// A snapshot without transfer figures, for a torrent that is not transferring.
+    pub fn idle(
+        info_hash: String,
+        name: String,
+        state: TorrentUiState,
+        output_dir: PathBuf,
+        uri: String,
+        sequential: bool,
+    ) -> Self {
+        Self {
+            info_hash,
+            name,
+            state,
+            downloaded: 0,
+            total: 0,
+            peers: 0,
+            speed_down: 0,
+            speed_up: 0,
+            output_dir,
+            uri,
+            peers_list: Vec::new(),
+            total_pieces: 0,
+            downloaded_pieces: 0,
+            sequential,
+            piece_map: Vec::new(),
+        }
+    }
+}
+
 /// The state of a torrent as the window shows it.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum TorrentUiState {
@@ -61,44 +92,95 @@ pub enum UiEvent {
     },
 }
 
+/// A torrent the engine knows, running or not.
 #[derive(Debug)]
-struct ActiveTorrent {
+struct TorrentEntry {
     /// Held, not read: the task watches the count of this Arc, and dropping the sender
     /// wakes its cancellation branch. Both are None while the torrent is not running.
     _canceller: Option<Arc<()>>,
     _cancel_tx: Option<tokio::sync::oneshot::Sender<()>>,
     /// Set true when this torrent is paused/stopped, so the listener can detect
     /// cancellation atomically rather than racing on `Arc::strong_count`.
-    cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+    cancel_flag: Arc<AtomicBool>,
     name: String,
     uri: String,
     output_dir: PathBuf,
     ui_tx: Sender<UiEvent>,
-    sequential: Arc<std::sync::atomic::AtomicBool>,
+    sequential: Arc<AtomicBool>,
 }
 
-enum EngineCmd {
-    Start {
-        info_hash: String,
+impl TorrentEntry {
+    fn new(
         name: String,
         uri: String,
         output_dir: PathBuf,
-        canceller: Arc<()>,
-        cancel_rx: tokio::sync::oneshot::Receiver<()>,
-        cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+        sequential: bool,
         ui_tx: Sender<UiEvent>,
-        sequential: Arc<std::sync::atomic::AtomicBool>,
-        pwp_port: u16,
-    },
+    ) -> Self {
+        Self {
+            _canceller: None,
+            _cancel_tx: None,
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            name,
+            uri,
+            output_dir,
+            ui_tx,
+            sequential: Arc::new(AtomicBool::new(sequential)),
+        }
+    }
+
+    /// Ends the running task, if any.
+    fn halt(&mut self) {
+        // Signal the listener before tearing down, so an in-flight snapshot cannot
+        // emit a stale update afterwards.
+        self.cancel_flag.store(true, Ordering::Release);
+        self._canceller = None;
+        self._cancel_tx = None;
+    }
+
+    fn idle_update(&self, info_hash: &str, state: TorrentUiState) -> UiUpdate {
+        UiUpdate::idle(
+            info_hash.to_string(),
+            self.name.clone(),
+            state,
+            self.output_dir.clone(),
+            self.uri.clone(),
+            self.sequential.load(Ordering::Relaxed),
+        )
+    }
+}
+
+/// What the engine thread needs to run one torrent.
+struct StartCmd {
+    info_hash: String,
+    name: String,
+    uri: String,
+    output_dir: PathBuf,
+    canceller: Arc<()>,
+    cancel_rx: tokio::sync::oneshot::Receiver<()>,
+    cancel_flag: Arc<AtomicBool>,
+    ui_tx: Sender<UiEvent>,
+    sequential: Arc<AtomicBool>,
+    pwp_port: u16,
+}
+
+/// What every torrent task shares: who we are, and where mtorrent's work runs.
+#[derive(Clone)]
+struct Shared {
+    peer_id: PeerId,
+    config_dir: PathBuf,
+    pwp_runtime: tokio::runtime::Handle,
+    storage_runtime: tokio::runtime::Handle,
+    dht: dht::CommandSink,
 }
 
 /// Starts, pauses and stops torrents. Running torrents are in `active`, the others in
 /// `saved`; the tasks themselves run on a thread of the engine's own.
 #[derive(Debug)]
 pub struct TorrentEngine {
-    active: Arc<Mutex<HashMap<String, ActiveTorrent>>>,
-    saved: Arc<Mutex<HashMap<String, ActiveTorrent>>>,
-    cmd_tx: tokio::sync::mpsc::Sender<EngineCmd>,
+    active: Arc<Mutex<HashMap<String, TorrentEntry>>>,
+    saved: Arc<Mutex<HashMap<String, TorrentEntry>>>,
+    cmd_tx: tokio::sync::mpsc::Sender<StartCmd>,
     config_dir: PathBuf,
     storage: crate::storage::Storage,
 }
@@ -113,21 +195,19 @@ impl TorrentEngine {
         storage: crate::storage::Storage,
     ) -> Self {
         log::info!("Creating torrent engine, config_dir: {:?}", config_dir);
-        let active: Arc<Mutex<HashMap<String, ActiveTorrent>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let saved: Arc<Mutex<HashMap<String, ActiveTorrent>>> =
-            Arc::new(Mutex::new(HashMap::new()));
         // Bounded so a wedged recv loop applies backpressure instead of growing
         // the queue without limit. The loop drains commands promptly in normal
         // operation, so the capacity is never approached.
         const CMD_QUEUE_CAP: usize = 256;
-        let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel::<EngineCmd>(CMD_QUEUE_CAP);
+        let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::channel::<StartCmd>(CMD_QUEUE_CAP);
 
-        let config_dir_clone = config_dir.clone();
-        let peer_id_clone = peer_id;
-        let pwp_clone = pwp_handle.clone();
-        let storage_clone = storage_handle.clone();
-        let dht_clone = dht_sink.clone();
+        let shared = Shared {
+            peer_id,
+            config_dir: config_dir.clone(),
+            pwp_runtime: pwp_handle,
+            storage_runtime: storage_handle,
+            dht: dht_sink,
+        };
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -136,129 +216,19 @@ impl TorrentEngine {
 
             rt.block_on(async {
                 let local = tokio::task::LocalSet::new();
-                local.run_until(async {
-                    while let Some(cmd) = cmd_rx.recv().await {
-                        match cmd {
-                            EngineCmd::Start { info_hash, name, uri, output_dir, canceller, cancel_rx, cancel_flag, ui_tx, sequential, pwp_port } => {
-                                let pid = peer_id_clone;
-                                let cd = config_dir_clone.clone();
-                                let pwp = pwp_clone.clone();
-                                let stor = storage_clone.clone();
-                                let dht = dht_clone.clone();
-                                // mtorrent derives the metainfo filename and the
-                                // download subfolder from the magnet's `dn` value,
-                                // then writes the fetched metainfo with a bare
-                                // fs::write (no parent mkdir). A `dn` containing a
-                                // path separator points at a non-existent subdir, so
-                                // the write fails with ENOENT ("No such file or
-                                // directory") right after metadata is fetched.
-                                // Sanitise `dn` so the derived path stays inside the
-                                // output dir.
-                                let uri = sanitize_magnet_dn(&uri);
-
-                                tokio::task::spawn_local(async move {
-                                    // Ensure the download dir exists; mtorrent's magnet
-                                    // preliminary stage writes the fetched metainfo into
-                                    // output_dir before content storage is created, which
-                                    // fails with ENOENT if the dir is missing.
-                                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
-                                        log::warn!("Failed to create output dir {:?}: {}", output_dir, e);
-                                    }
-
-                                    let downloaded_bytes = Arc::new(Mutex::new(0u64));
-                                    let total_bytes = Arc::new(Mutex::new(0u64));
-                                    let dl_clone = Arc::clone(&downloaded_bytes);
-                                    let tot_clone = Arc::clone(&total_bytes);
-
-                                    let listener = GtkListener::new(
-                                        Arc::downgrade(&canceller),
-                                        Arc::clone(&cancel_flag),
-                                        ui_tx.clone(),
-                                        info_hash.clone(),
-                                        name.clone(),
-                                        uri.clone(),
-                                        output_dir.clone(),
-                                        downloaded_bytes,
-                                        total_bytes,
-                                        Arc::clone(&sequential),
-                                    );
-                                    let config = app::main::Config {
-                                        local_peer_id: pid,
-                                        output_dir: output_dir.clone(),
-                                        config_dir: cd,
-                                        use_upnp: false,
-                                        // Port 0 means "unset": let mtorrent pick a stable port
-                                        // (port_from_hash) instead of binding an ephemeral one and
-                                        // announcing port 0 to trackers.
-                                        pwp_port: (pwp_port != 0).then_some(pwp_port),
-                                        bind_interface: None,
-                                    };
-                                    let ctx = app::main::Context {
-                                        dht_handle: Some(dht),
-                                        pwp_runtime: pwp,
-                                        storage_runtime: stor,
-                                    };
-
-                                    let mut rx = cancel_rx;
-                                    let seq_clone = Arc::clone(&sequential);
-                                    let is_seq = seq_clone.load(std::sync::atomic::Ordering::Relaxed);
-                                    let result = mtorrent::utils::re_exports::mtorrent_core::SEQUENTIAL.scope(seq_clone, async {
-                                        tokio::select! {
-                                            res = app::main::single_torrent(&uri, listener, config, ctx) => Some(res),
-                                            _ = &mut rx => {
-                                                log::info!("Torrent task paused/cancelled: {}", info_hash);
-                                                None
-                                            }
-                                        }
-                                    }).await;
-
-                                    if let Some(res) = result {
-                                        if Arc::strong_count(&canceller) > 1 {
-                                            match &res {
-                                                Ok(_) => log::info!("Torrent completed: {}", info_hash),
-                                                Err(e) => log::error!("Torrent failed: {}: {}", info_hash, e),
-                                            }
-                                            let _ = ui_tx
-                                                .send(UiEvent::Finished {
-                                                    info_hash,
-                                                    error: res.err().map(|e| e.to_string()),
-                                                })
-                                                .await;
-                                        }
-                                    } else {
-                                        let dl = *lock_recover(&dl_clone, "downloaded bytes");
-                                        let tot = *lock_recover(&tot_clone, "total bytes");
-                                        let _ = ui_tx
-                                            .send(UiEvent::Update(UiUpdate {
-                                                info_hash,
-                                                name,
-                                                state: TorrentUiState::Paused,
-                                                downloaded: dl,
-                                                total: tot,
-                                                peers: 0,
-                                                speed_down: 0,
-                                                speed_up: 0,
-                                                output_dir,
-                                                uri,
-                                                peers_list: Vec::new(),
-                                                total_pieces: 0,
-                                                downloaded_pieces: 0,
-                                                sequential: is_seq,
-                                                piece_map: Vec::new(),
-                                            }))
-                                            .await;
-                                    }
-                                });
-                            }
+                local
+                    .run_until(async {
+                        while let Some(cmd) = cmd_rx.recv().await {
+                            tokio::task::spawn_local(run_torrent(cmd, shared.clone()));
                         }
-                    }
-                }).await;
+                    })
+                    .await;
             });
         });
 
         Self {
-            active,
-            saved,
+            active: Arc::new(Mutex::new(HashMap::new())),
+            saved: Arc::new(Mutex::new(HashMap::new())),
             cmd_tx,
             config_dir,
             storage,
@@ -278,29 +248,18 @@ impl TorrentEngine {
 
         if let Some(existing) = map.get(&info_hash) {
             log::info!("Torrent already active: {} ({})", name, info_hash);
-            existing
-                .sequential
-                .store(sequential, std::sync::atomic::Ordering::Relaxed);
+            existing.sequential.store(sequential, Ordering::Relaxed);
             // Re-add with a possibly-changed sequential flag: notify the UI so the
             // displayed setting does not go stale. Zeroed counters are backfilled
             // from the previous update by the UI's coalescing logic.
-            let _ = ui_tx.try_send(UiEvent::Update(UiUpdate {
-                info_hash: info_hash.clone(),
-                name: name.clone(),
-                state: TorrentUiState::Downloading,
-                downloaded: 0,
-                total: 0,
-                peers: 0,
-                speed_down: 0,
-                speed_up: 0,
-                output_dir: output_dir.clone(),
-                uri: uri.clone(),
-                peers_list: Vec::new(),
-                total_pieces: 0,
-                downloaded_pieces: 0,
+            let _ = ui_tx.try_send(UiEvent::Update(UiUpdate::idle(
+                info_hash.clone(),
+                name,
+                TorrentUiState::Downloading,
+                output_dir,
+                uri,
                 sequential,
-                piece_map: Vec::new(),
-            }));
+            )));
             return info_hash;
         }
 
@@ -311,23 +270,11 @@ impl TorrentEngine {
             sequential
         );
 
-        let pwp_port = self.storage.pwp_port();
-        let canceller = Arc::new(());
-        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
-        let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let seq = Arc::new(std::sync::atomic::AtomicBool::new(sequential));
-        if let Err(e) = self.cmd_tx.try_send(EngineCmd::Start {
-            info_hash: info_hash.clone(),
-            name: name.clone(),
-            uri: uri.clone(),
-            output_dir: output_dir.clone(),
-            canceller: Arc::clone(&canceller),
-            cancel_rx,
-            cancel_flag: Arc::clone(&cancel_flag),
-            ui_tx: ui_tx.clone(),
-            sequential: Arc::clone(&seq),
-            pwp_port,
-        }) {
+        let torrent = TorrentEntry::new(name, uri, output_dir, sequential, ui_tx.clone());
+        // Immediately notify UI of the new downloading torrent
+        let update = torrent.idle_update(&info_hash, TorrentUiState::Downloading);
+        if let Err(err) = self.launch(&info_hash, torrent, &mut map) {
+            let (_, e) = *err;
             drop(map);
             log::error!("Failed to queue torrent start {}: {}", info_hash, e);
             let _ = ui_tx.try_send(UiEvent::Finished {
@@ -336,39 +283,9 @@ impl TorrentEngine {
             });
             return info_hash;
         }
-        map.insert(
-            info_hash.clone(),
-            ActiveTorrent {
-                _canceller: Some(canceller),
-                _cancel_tx: Some(cancel_tx),
-                cancel_flag,
-                name: name.clone(),
-                uri: uri.clone(),
-                output_dir: output_dir.clone(),
-                ui_tx: ui_tx.clone(),
-                sequential: seq,
-            },
-        );
         drop(map);
 
-        // Immediately notify UI of the new downloading torrent
-        let _ = ui_tx.try_send(UiEvent::Update(UiUpdate {
-            info_hash: info_hash.clone(),
-            name: name.clone(),
-            state: TorrentUiState::Downloading,
-            downloaded: 0,
-            total: 0,
-            peers: 0,
-            speed_down: 0,
-            speed_up: 0,
-            output_dir: output_dir.clone(),
-            uri: uri.clone(),
-            peers_list: Vec::new(),
-            total_pieces: 0,
-            downloaded_pieces: 0,
-            sequential,
-            piece_map: Vec::new(),
-        }));
+        let _ = ui_tx.try_send(UiEvent::Update(update));
         info_hash
     }
 
@@ -381,80 +298,24 @@ impl TorrentEngine {
         sequential: bool,
         ui_tx: Sender<UiEvent>,
     ) -> String {
-        let info_hash = torrent_id(&uri);
-        let mut map = lock_recover(&self.saved, "saved map");
-
-        if let Some(existing) = map.get(&info_hash) {
-            log::info!("Torrent already saved/paused: {} ({})", name, info_hash);
-            existing
-                .sequential
-                .store(sequential, std::sync::atomic::Ordering::Relaxed);
-            // Notify the UI of the (possibly changed) sequential flag on re-add.
-            let _ = ui_tx.try_send(UiEvent::Update(UiUpdate {
-                info_hash: info_hash.clone(),
-                name: name.clone(),
-                state: TorrentUiState::Paused,
-                downloaded: 0,
-                total: 0,
-                peers: 0,
-                speed_down: 0,
-                speed_up: 0,
-                output_dir: output_dir.clone(),
-                uri: uri.clone(),
-                peers_list: Vec::new(),
-                total_pieces: 0,
-                downloaded_pieces: 0,
-                sequential,
-                piece_map: Vec::new(),
-            }));
-            return info_hash;
-        }
-
-        log::info!(
-            "Adding paused torrent: {} ({}) with sequential={}",
-            name,
-            info_hash,
-            sequential
-        );
-
-        let seq = Arc::new(std::sync::atomic::AtomicBool::new(sequential));
-        map.insert(
+        let update_name = name.clone();
+        let update_uri = uri.clone();
+        let update_dir = output_dir.clone();
+        let info_hash = self.add_paused_silent(name, uri, output_dir, sequential, ui_tx.clone());
+        // Notify the UI of the new paused torrent, or of the (possibly changed)
+        // sequential flag on re-add.
+        let _ = ui_tx.try_send(UiEvent::Update(UiUpdate::idle(
             info_hash.clone(),
-            ActiveTorrent {
-                _canceller: None,
-                _cancel_tx: None,
-                cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                name: name.clone(),
-                uri: uri.clone(),
-                output_dir: output_dir.clone(),
-                ui_tx: ui_tx.clone(),
-                sequential: seq,
-            },
-        );
-        drop(map);
-
-        // Immediately notify UI of the new paused torrent
-        let _ = ui_tx.try_send(UiEvent::Update(UiUpdate {
-            info_hash: info_hash.clone(),
-            name: name.clone(),
-            state: TorrentUiState::Paused,
-            downloaded: 0,
-            total: 0,
-            peers: 0,
-            speed_down: 0,
-            speed_up: 0,
-            output_dir: output_dir.clone(),
-            uri: uri.clone(),
-            peers_list: Vec::new(),
-            total_pieces: 0,
-            downloaded_pieces: 0,
+            update_name,
+            TorrentUiState::Paused,
+            update_dir,
+            update_uri,
             sequential,
-            piece_map: Vec::new(),
-        }));
-
+        )));
         info_hash
     }
 
+    /// Adds a torrent in a paused state, without telling the window.
     pub fn add_paused_silent(
         &self,
         name: String,
@@ -468,35 +329,54 @@ impl TorrentEngine {
 
         if let Some(existing) = map.get(&info_hash) {
             log::info!("Torrent already saved/paused: {} ({})", name, info_hash);
-            existing
-                .sequential
-                .store(sequential, std::sync::atomic::Ordering::Relaxed);
+            existing.sequential.store(sequential, Ordering::Relaxed);
             return info_hash;
         }
 
         log::info!(
-            "Adding paused torrent silently: {} ({}) with sequential={}",
+            "Adding paused torrent: {} ({}) with sequential={}",
             name,
             info_hash,
             sequential
         );
-
-        let seq = Arc::new(std::sync::atomic::AtomicBool::new(sequential));
         map.insert(
             info_hash.clone(),
-            ActiveTorrent {
-                _canceller: None,
-                _cancel_tx: None,
-                cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                name,
-                uri,
-                output_dir,
-                ui_tx,
-                sequential: seq,
-            },
+            TorrentEntry::new(name, uri, output_dir, sequential, ui_tx),
         );
-
         info_hash
+    }
+
+    /// Hands `torrent` to the engine thread and records it as running. The torrent comes
+    /// back when the thread cannot take it.
+    fn launch(
+        &self,
+        info_hash: &str,
+        mut torrent: TorrentEntry,
+        active: &mut HashMap<String, TorrentEntry>,
+    ) -> Result<(), Box<(TorrentEntry, String)>> {
+        let canceller = Arc::new(());
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        let cmd = StartCmd {
+            info_hash: info_hash.to_string(),
+            name: torrent.name.clone(),
+            uri: torrent.uri.clone(),
+            output_dir: torrent.output_dir.clone(),
+            canceller: Arc::clone(&canceller),
+            cancel_rx,
+            cancel_flag: Arc::clone(&cancel_flag),
+            ui_tx: torrent.ui_tx.clone(),
+            sequential: Arc::clone(&torrent.sequential),
+            pwp_port: self.storage.pwp_port(),
+        };
+        if let Err(e) = self.cmd_tx.try_send(cmd) {
+            return Err(Box::new((torrent, e.to_string())));
+        }
+        torrent._canceller = Some(canceller);
+        torrent._cancel_tx = Some(cancel_tx);
+        torrent.cancel_flag = cancel_flag;
+        active.insert(info_hash.to_string(), torrent);
+        Ok(())
     }
 
     /// Moves a torrent that terminated with an error from the active map to the
@@ -505,11 +385,7 @@ impl TorrentEngine {
     pub fn mark_failed(&self, info_hash: &str) {
         let mut active_map = lock_recover(&self.active, "active map");
         if let Some(mut torrent) = active_map.remove(info_hash) {
-            torrent
-                .cancel_flag
-                .store(true, std::sync::atomic::Ordering::Release);
-            torrent._canceller = None;
-            torrent._cancel_tx = None;
+            torrent.halt();
             drop(active_map);
             lock_recover(&self.saved, "saved map").insert(info_hash.to_string(), torrent);
         }
@@ -519,14 +395,9 @@ impl TorrentEngine {
     pub fn stop(&self, info_hash: &str) {
         log::info!("Stopping torrent: {}", info_hash);
         let mut active = lock_recover(&self.active, "active map");
-        if let Some(torrent) = active.get(info_hash) {
-            // Signal the listener atomically before tearing down, so an in-flight
-            // snapshot cannot emit a stale update after removal.
-            torrent
-                .cancel_flag
-                .store(true, std::sync::atomic::Ordering::Release);
+        if let Some(mut torrent) = active.remove(info_hash) {
+            torrent.halt();
         }
-        active.remove(info_hash);
         drop(active);
         lock_recover(&self.saved, "saved map").remove(info_hash);
     }
@@ -536,17 +407,13 @@ impl TorrentEngine {
         log::info!("Toggling sequential for {}: {}", info_hash, sequential);
         let active_map = lock_recover(&self.active, "active map");
         if let Some(torrent) = active_map.get(info_hash) {
-            torrent
-                .sequential
-                .store(sequential, std::sync::atomic::Ordering::Relaxed);
+            torrent.sequential.store(sequential, Ordering::Relaxed);
             return;
         }
         drop(active_map);
         let saved_map = lock_recover(&self.saved, "saved map");
         if let Some(torrent) = saved_map.get(info_hash) {
-            torrent
-                .sequential
-                .store(sequential, std::sync::atomic::Ordering::Relaxed);
+            torrent.sequential.store(sequential, Ordering::Relaxed);
         }
     }
 
@@ -554,70 +421,26 @@ impl TorrentEngine {
     pub fn toggle(&self, info_hash: &str) {
         let mut active_map = lock_recover(&self.active, "active map");
         let mut saved_map = lock_recover(&self.saved, "saved map");
-        if active_map.contains_key(info_hash) {
+        if let Some(mut torrent) = active_map.remove(info_hash) {
             log::info!("Pausing torrent: {}", info_hash);
-            if let Some(mut torrent) = active_map.remove(info_hash) {
-                torrent
-                    .cancel_flag
-                    .store(true, std::sync::atomic::Ordering::Release);
-                torrent._canceller = None;
-                torrent._cancel_tx = None;
-                saved_map.insert(info_hash.to_string(), torrent);
-            }
+            torrent.halt();
+            saved_map.insert(info_hash.to_string(), torrent);
         } else if let Some(torrent) = saved_map.remove(info_hash) {
             log::info!("Resuming torrent: {}", info_hash);
-            // Resume: move from saved to active, restart download.
-            // Re-acquire `active` under one lock spanning the check-and-insert so a
-            // concurrent start/toggle for the same hash cannot double-dispatch.
+            // Resume: move from saved to active, restart download. `active` stays locked
+            // from the check above to the insert, so a concurrent start/toggle for the
+            // same hash cannot double-dispatch.
             drop(saved_map);
-            let mut active_map2 = active_map;
-            if active_map2.contains_key(info_hash) {
-                log::info!(
-                    "Torrent already active during resume, skipping: {}",
-                    info_hash
-                );
-                return;
-            }
-            let canceller = Arc::new(());
-            let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
-            let cancel_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let ui_tx = torrent.ui_tx.clone();
-            let name = torrent.name.clone();
-            let seq = Arc::clone(&torrent.sequential);
-            if let Err(e) = self.cmd_tx.try_send(EngineCmd::Start {
-                info_hash: info_hash.to_string(),
-                name,
-                uri: torrent.uri.clone(),
-                output_dir: torrent.output_dir.clone(),
-                canceller: Arc::clone(&canceller),
-                cancel_rx,
-                cancel_flag: Arc::clone(&cancel_flag),
-                ui_tx: ui_tx.clone(),
-                sequential: Arc::clone(&seq),
-                pwp_port: self.storage.pwp_port(),
-            }) {
+            if let Err(err) = self.launch(info_hash, torrent, &mut active_map) {
+                let (torrent, e) = *err;
                 log::error!("Failed to queue torrent resume {}: {}", info_hash, e);
-                let _ = ui_tx.try_send(UiEvent::Finished {
+                let _ = torrent.ui_tx.try_send(UiEvent::Finished {
                     info_hash: info_hash.to_string(),
                     error: Some("Engine unavailable".into()),
                 });
-                drop(active_map2);
+                drop(active_map);
                 lock_recover(&self.saved, "saved map").insert(info_hash.to_string(), torrent);
-                return;
             }
-            active_map2.insert(
-                info_hash.to_string(),
-                ActiveTorrent {
-                    _canceller: Some(canceller),
-                    _cancel_tx: Some(cancel_tx),
-                    cancel_flag,
-                    name: torrent.name,
-                    uri: torrent.uri,
-                    output_dir: torrent.output_dir,
-                    ui_tx,
-                    sequential: seq,
-                },
-            );
         }
     }
 
@@ -626,16 +449,9 @@ impl TorrentEngine {
         log::info!("Pausing all active torrents in engine");
         let mut active_map = lock_recover(&self.active, "active map");
         let mut saved_map = lock_recover(&self.saved, "saved map");
-        let active_keys: Vec<String> = active_map.keys().cloned().collect();
-        for info_hash in active_keys {
-            if let Some(mut torrent) = active_map.remove(&info_hash) {
-                torrent
-                    .cancel_flag
-                    .store(true, std::sync::atomic::Ordering::Release);
-                torrent._canceller = None;
-                torrent._cancel_tx = None;
-                saved_map.insert(info_hash, torrent);
-            }
+        for (info_hash, mut torrent) in active_map.drain() {
+            torrent.halt();
+            saved_map.insert(info_hash, torrent);
         }
     }
 
@@ -647,6 +463,111 @@ impl TorrentEngine {
     /// The data directory, where copied .torrent files are kept.
     pub fn config_dir(&self) -> &PathBuf {
         &self.config_dir
+    }
+}
+
+/// Runs one torrent on the engine thread until it ends or is cancelled, and tells the
+/// window how it went.
+async fn run_torrent(cmd: StartCmd, shared: Shared) {
+    let StartCmd {
+        info_hash,
+        name,
+        uri,
+        output_dir,
+        canceller,
+        cancel_rx,
+        cancel_flag,
+        ui_tx,
+        sequential,
+        pwp_port,
+    } = cmd;
+    // mtorrent derives the metainfo filename and the download subfolder from the
+    // magnet's `dn` value, then writes the fetched metainfo with a bare fs::write (no
+    // parent mkdir). A `dn` containing a path separator points at a non-existent
+    // subdir, so the write fails with ENOENT ("No such file or directory") right
+    // after metadata is fetched. Sanitise `dn` so the derived path stays inside the
+    // output dir.
+    let uri = sanitize_magnet_dn(&uri);
+
+    // Ensure the download dir exists; mtorrent's magnet preliminary stage writes the
+    // fetched metainfo into output_dir before content storage is created, which fails
+    // with ENOENT if the dir is missing.
+    if let Err(e) = std::fs::create_dir_all(&output_dir) {
+        log::warn!("Failed to create output dir {:?}: {}", output_dir, e);
+    }
+
+    let downloaded_bytes = Arc::new(Mutex::new(0u64));
+    let total_bytes = Arc::new(Mutex::new(0u64));
+
+    let listener = GtkListener::new(
+        Arc::downgrade(&canceller),
+        Arc::clone(&cancel_flag),
+        ui_tx.clone(),
+        info_hash.clone(),
+        name.clone(),
+        uri.clone(),
+        output_dir.clone(),
+        Arc::clone(&downloaded_bytes),
+        Arc::clone(&total_bytes),
+        Arc::clone(&sequential),
+    );
+    let config = app::main::Config {
+        local_peer_id: shared.peer_id,
+        output_dir: output_dir.clone(),
+        config_dir: shared.config_dir,
+        use_upnp: false,
+        // Port 0 means "unset": let mtorrent pick a stable port (port_from_hash)
+        // instead of binding an ephemeral one and announcing port 0 to trackers.
+        pwp_port: (pwp_port != 0).then_some(pwp_port),
+        bind_interface: None,
+    };
+    let ctx = app::main::Context {
+        dht_handle: Some(shared.dht),
+        pwp_runtime: shared.pwp_runtime,
+        storage_runtime: shared.storage_runtime,
+    };
+
+    let mut rx = cancel_rx;
+    let is_seq = sequential.load(Ordering::Relaxed);
+    let result = mtorrent::utils::re_exports::mtorrent_core::SEQUENTIAL
+        .scope(sequential, async {
+            tokio::select! {
+                res = app::main::single_torrent(&uri, listener, config, ctx) => Some(res),
+                _ = &mut rx => {
+                    log::info!("Torrent task paused/cancelled: {}", info_hash);
+                    None
+                }
+            }
+        })
+        .await;
+
+    if let Some(res) = result {
+        if Arc::strong_count(&canceller) > 1 {
+            match &res {
+                Ok(_) => log::info!("Torrent completed: {}", info_hash),
+                Err(e) => log::error!("Torrent failed: {}: {}", info_hash, e),
+            }
+            let _ = ui_tx
+                .send(UiEvent::Finished {
+                    info_hash,
+                    error: res.err().map(|e| e.to_string()),
+                })
+                .await;
+        }
+    } else {
+        let update = UiUpdate {
+            downloaded: *lock_recover(&downloaded_bytes, "downloaded bytes"),
+            total: *lock_recover(&total_bytes, "total bytes"),
+            ..UiUpdate::idle(
+                info_hash,
+                name,
+                TorrentUiState::Paused,
+                output_dir,
+                uri,
+                is_seq,
+            )
+        };
+        let _ = ui_tx.send(UiEvent::Update(update)).await;
     }
 }
 

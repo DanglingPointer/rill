@@ -879,21 +879,18 @@ impl RillWindow {
                 _ => TorrentUiState::Paused,
             };
             let update = UiUpdate {
-                info_hash: torrent.info_hash.clone(),
-                name: torrent.name.clone(),
-                state,
                 downloaded: torrent.downloaded,
                 total: torrent.total,
-                peers: 0,
-                speed_down: 0,
-                speed_up: 0,
-                output_dir: torrent.output_dir_path(),
-                uri: torrent.uri.clone(),
-                peers_list: Vec::new(),
                 total_pieces: torrent.total_pieces as usize,
                 downloaded_pieces: torrent.downloaded_pieces as usize,
-                sequential: torrent.sequential,
-                piece_map: Vec::new(),
+                ..UiUpdate::idle(
+                    torrent.info_hash.clone(),
+                    torrent.name.clone(),
+                    state,
+                    torrent.output_dir_path(),
+                    torrent.uri.clone(),
+                    torrent.sequential,
+                )
             };
             // Registered as paused, so that resuming starts the task.
             self.engine().add_paused_silent(

@@ -186,21 +186,18 @@ impl StateListener for GtkListener {
         {
             log::debug!("Listener cancelled for: {}", self.info_hash);
             let _ = self.tx.try_send(UiEvent::Update(UiUpdate {
-                info_hash: self.info_hash.clone(),
-                name: self.name.clone(),
-                state: TorrentUiState::Paused,
                 downloaded: self.last_downloaded,
                 total: snapshot.bytes.total as u64,
-                peers: 0,
-                speed_down: 0,
-                speed_up: 0,
-                output_dir: self.output_dir.clone(),
-                uri: self.uri.clone(),
-                peers_list: Vec::new(),
                 total_pieces,
                 downloaded_pieces,
-                sequential: is_sequential,
-                piece_map: Vec::new(),
+                ..UiUpdate::idle(
+                    self.info_hash.clone(),
+                    self.name.clone(),
+                    TorrentUiState::Paused,
+                    self.output_dir.clone(),
+                    self.uri.clone(),
+                    is_sequential,
+                )
             }));
             return ControlFlow::Break(());
         }
