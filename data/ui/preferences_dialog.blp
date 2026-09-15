@@ -43,7 +43,7 @@ template $RillPreferencesDialog: Adw.PreferencesDialog {
 
       Adw.SpinRow port_row {
         title: _("Listening Port");
-        subtitle: _("Used by torrents started from now on. 0 gives each torrent a port of its own.");
+        subtitle: _("Torrents started from now on take one port each, counting up from this one. 0 gives each torrent a port derived from it.");
         notify::value => $on_port_changed() swapped;
 
         adjustment: Adjustment {

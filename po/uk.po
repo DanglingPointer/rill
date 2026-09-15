@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-14 00:16+0300\n"
+"POT-Creation-Date: 2026-09-15 09:10+0300\n"
 "PO-Revision-Date: 2026-09-14 00:00+0300\n"
 "Last-Translator: sachesi <xsachesi@pm.me>\n"
 "Language-Team: Ukrainian\n"
@@ -27,7 +27,7 @@ msgid "BitTorrent Client"
 msgstr "Клієнт BitTorrent"
 
 #: data/io.github.sachesi.rill.desktop:4
-#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:162
+#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:164
 #: src/tray.rs:38
 #, no-c-format
 msgid "Download files over BitTorrent"
@@ -188,7 +188,7 @@ msgid "First release."
 msgstr "Перший випуск."
 
 #. Translators: put your name here, one per line, optionally with an email address.
-#: src/application.rs:164
+#: src/application.rs:166
 #, no-c-format
 msgid "translator-credits"
 msgstr "sachesi <xsachesi@pm.me>"
@@ -224,7 +224,7 @@ msgid "This is not a magnet link"
 msgstr "Це не magnet-посилання"
 
 #. Translators: %s is a file name.
-#: src/dialogs/add_torrent.rs:230
+#: src/dialogs/add_torrent.rs:232
 #, no-c-format
 msgid "“%s” is not a torrent file"
 msgstr "«%s» не є торент-файлом"
@@ -307,12 +307,12 @@ msgid "Failed"
 msgstr "Помилка"
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:209 src/torrent_row.rs:282
+#: src/dialogs/torrent_info.rs:209 src/torrent_row.rs:279
 #, no-c-format
 msgid "%1 of %2"
 msgstr "%1 з %2"
 
-#: src/dialogs/torrent_info.rs:213 src/torrent_row.rs:289
+#: src/dialogs/torrent_info.rs:213 src/torrent_row.rs:286
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr "Очікування метаданих"
@@ -358,17 +358,17 @@ msgstr "Відновити"
 msgid "Delete"
 msgstr "Видалити"
 
-#: src/torrent_row.rs:252
+#: src/torrent_row.rs:249
 #, no-c-format
 msgid "Could not open the folder"
 msgstr "Не вдалося відкрити теку"
 
-#: src/torrent_row.rs:290
+#: src/torrent_row.rs:287
 #, no-c-format
 msgid "Size unknown"
 msgstr "Розмір невідомий"
 
-#: src/torrent_row.rs:299
+#: src/torrent_row.rs:296
 #, no-c-format
 msgid "%d peer"
 msgid_plural "%d peers"
@@ -508,7 +508,7 @@ msgstr "Помилка в «%1»: %2"
 msgid "Download Complete"
 msgstr "Завантаження завершено"
 
-#: src/window.rs:805
+#: src/window.rs:823
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr "Не вдалося зберегти торент: %s"
@@ -571,9 +571,11 @@ msgstr "Порт прослуховування"
 
 #: ui/preferences_dialog.ui:55
 msgid ""
-"Used by torrents started from now on. 0 gives each torrent a port of its own."
+"Torrents started from now on take one port each, counting up from this one. "
+"0 gives each torrent a port derived from it."
 msgstr ""
-"Для торентів, запущених відтепер. 0 означає окремий порт для кожного торента."
+"Торенти, запущені відтепер, займають по одному порту, починаючи з цього. 0 "
+"дає кожному торенту порт, похідний від нього."
 
 #: ui/preferences_dialog.ui:71
 msgid "Troubleshooting"

@@ -107,6 +107,8 @@ struct TorrentEntry {
     output_dir: PathBuf,
     ui_tx: Sender<UiEvent>,
     sequential: Arc<AtomicBool>,
+    /// The port the torrent listens on while it runs; 0 when mtorrent derives it.
+    port: u16,
 }
 
 impl TorrentEntry {
@@ -126,6 +128,7 @@ impl TorrentEntry {
             output_dir,
             ui_tx,
             sequential: Arc::new(AtomicBool::new(sequential)),
+            port: 0,
         }
     }
 
@@ -346,6 +349,10 @@ impl TorrentEngine {
         let canceller = Arc::new(());
         let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
         let cancel_flag = Arc::new(AtomicBool::new(false));
+        let port = listening_port(
+            self.storage.pwp_port(),
+            active.values().map(|torrent| torrent.port),
+        );
         let cmd = StartCmd {
             info_hash: info_hash.to_string(),
             name: torrent.name.clone(),
@@ -356,7 +363,7 @@ impl TorrentEngine {
             cancel_flag: Arc::clone(&cancel_flag),
             ui_tx: torrent.ui_tx.clone(),
             sequential: Arc::clone(&torrent.sequential),
-            pwp_port: self.storage.pwp_port(),
+            pwp_port: port,
         };
         if let Err(e) = self.cmd_tx.try_send(cmd) {
             return Err(Box::new((torrent, e.to_string())));
@@ -364,6 +371,7 @@ impl TorrentEngine {
         torrent._canceller = Some(canceller);
         torrent._cancel_tx = Some(cancel_tx);
         torrent.cancel_flag = cancel_flag;
+        torrent.port = port;
         active.insert(info_hash.to_string(), torrent);
         Ok(())
     }
@@ -463,6 +471,20 @@ impl TorrentEngine {
     pub fn config_dir(&self) -> &PathBuf {
         &self.config_dir
     }
+}
+
+/// The port a torrent about to run listens on: the first from `base` up that no running
+/// torrent has, or 0, for mtorrent to derive one from the torrent, when `base` is 0. Each
+/// torrent needs a port of its own: mtorrent's listeners share a port, and the system would
+/// hand a connection for one torrent to any of them.
+fn listening_port(base: u16, taken: impl IntoIterator<Item = u16>) -> u16 {
+    if base == 0 {
+        return 0;
+    }
+    let taken: std::collections::HashSet<u16> = taken.into_iter().collect();
+    (base..=u16::MAX)
+        .find(|port| !taken.contains(port))
+        .unwrap_or(0)
 }
 
 /// Runs one torrent on the engine thread until it ends or is cancelled, and tells the
@@ -698,7 +720,15 @@ fn hex(hash: &[u8; 20]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{name_nameless_magnet, torrent_id};
+    use super::{listening_port, name_nameless_magnet, torrent_id};
+
+    #[test]
+    fn running_torrents_listen_on_ports_of_their_own() {
+        assert_eq!(listening_port(0, [0, 0]), 0);
+        assert_eq!(listening_port(6881, []), 6881);
+        assert_eq!(listening_port(6881, [6881, 6883]), 6882);
+        assert_eq!(listening_port(u16::MAX, [u16::MAX]), 0);
+    }
 
     #[test]
     fn torrent_id_uses_magnet_info_hash() {
