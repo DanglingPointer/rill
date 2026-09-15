@@ -2,7 +2,7 @@
 
 ## What it needs
 
-To build: Rust 1.92 or newer with Cargo, a C compiler (SQLite is compiled in),
+To build: Rust 1.95 or newer with Cargo, a C compiler (SQLite is compiled in),
 `blueprint-compiler`, `just`, gettext, and the development packages of GTK 4.20 and
 libadwaita 1.8. On Fedora:
 

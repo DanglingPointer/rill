@@ -17,7 +17,7 @@ running in the background.
     just build
     sudo just install        # or: just prefix=$HOME/.local build install
 
-Build needs Rust 1.92, `blueprint-compiler`, `just`, gettext and the development packages
+Build needs Rust 1.95, `blueprint-compiler`, `just`, gettext and the development packages
 for GTK and libadwaita. Details, other prefixes and removal are in
 [docs/installing.md](docs/installing.md).
 

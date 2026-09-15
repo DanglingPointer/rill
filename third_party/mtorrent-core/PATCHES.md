@@ -1,7 +1,7 @@
 # Changes to mtorrent-core
 
-This is mtorrent-core 0.5.2 from crates.io (upstream commit
-`28d33a83cb3b46b429b25825d8154668836f62f8` of
+This is mtorrent-core 0.5.5 from crates.io (upstream commit
+`5a776af5ddf6da94ef994993ca8486764cfecdb6` of
 [mtorrent](https://github.com/DanglingPointer/mtorrent)), by Mikhail Vasilyev, under the
 Apache License 2.0 in [LICENSE](LICENSE). Rill builds against this copy through
 `[patch.crates-io]` in its `Cargo.toml`. The files listed below were changed; each
