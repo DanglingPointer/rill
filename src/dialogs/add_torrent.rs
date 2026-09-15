@@ -205,7 +205,9 @@ impl AddTorrentDialog {
                 return;
             }
             self.close();
-            window.start_torrent(magnet_name(&uri), uri, folder, sequential, start_now);
+            let name = magnet_name(&uri);
+            let uri = crate::engine::name_nameless_magnet(&uri);
+            window.start_torrent(name, uri, folder, sequential, start_now);
             return;
         };
 

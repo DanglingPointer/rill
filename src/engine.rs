@@ -593,17 +593,7 @@ pub(crate) fn sanitize_magnet_dn(uri: &str) -> String {
         .map(|s| s.into_owned())
         .unwrap_or_else(|_| raw.to_string());
 
-    let cleaned: String = decoded
-        .chars()
-        .map(|c| match c {
-            '/' | '\\' | '\0' => '_',
-            c if c.is_control() => '_',
-            c => c,
-        })
-        .collect::<String>()
-        .trim()
-        .trim_matches('.')
-        .to_string();
+    let cleaned = clean_name(&decoded);
     let cleaned = if cleaned.is_empty() {
         "torrent".to_string()
     } else {
@@ -615,6 +605,48 @@ pub(crate) fn sanitize_magnet_dn(uri: &str) -> String {
     }
     let encoded = urlencoding::encode(&cleaned);
     format!("{}{}{}", &uri[..value_start], encoded, &uri[value_end..])
+}
+
+/// A torrent name as a single file name: separators and control characters become `_`,
+/// and surrounding spaces and dots go. Empty when nothing is left.
+fn clean_name(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '/' | '\\' | '\0' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string()
+}
+
+/// Names a magnet link after its info hash when it has no usable name (`dn`) of its own.
+/// mtorrent names both the fetched metainfo and the download folder after `dn`, with
+/// "unnamed" for a link without one, so two such links saved to one folder would share
+/// them.
+pub(crate) fn name_nameless_magnet(uri: &str) -> String {
+    use mtorrent::utils::re_exports::mtorrent_core::input::MagnetLink;
+    use std::str::FromStr;
+
+    let Ok(magnet) = MagnetLink::from_str(uri) else {
+        return uri.to_string();
+    };
+    if magnet
+        .name()
+        .is_some_and(|name| !clean_name(name).is_empty())
+    {
+        return uri.to_string();
+    }
+    let Some((head, query)) = uri.split_once('?') else {
+        return uri.to_string();
+    };
+    let params: Vec<&str> = query
+        .split('&')
+        .filter(|param| !param.is_empty() && !param.starts_with("dn="))
+        .collect();
+    format!("{head}?{}&dn={}", params.join("&"), hex(magnet.info_hash()))
 }
 
 /// Locks a mutex, recovering from poisoning instead of panicking. A panic in one
@@ -640,15 +672,7 @@ fn hash_uri(uri: &str) -> String {
 /// downloads. Falls back to hashing the URI text when nothing parses.
 pub(crate) fn torrent_id(uri: &str) -> String {
     use mtorrent::utils::re_exports::mtorrent_core::input::{MagnetLink, Metainfo};
-    use std::fmt::Write;
     use std::str::FromStr;
-
-    let hex = |hash: &[u8; 20]| {
-        hash.iter().fold(String::with_capacity(40), |mut s, b| {
-            let _ = write!(s, "{:02x}", b);
-            s
-        })
-    };
 
     let path = std::path::Path::new(uri);
     if path.is_file() {
@@ -661,9 +685,19 @@ pub(crate) fn torrent_id(uri: &str) -> String {
     hash_uri(uri)
 }
 
+/// An info hash in lowercase hex.
+fn hex(hash: &[u8; 20]) -> String {
+    use std::fmt::Write;
+
+    hash.iter().fold(String::with_capacity(40), |mut s, b| {
+        let _ = write!(s, "{:02x}", b);
+        s
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::torrent_id;
+    use super::{name_nameless_magnet, torrent_id};
 
     #[test]
     fn torrent_id_uses_magnet_info_hash() {
@@ -683,5 +717,22 @@ mod tests {
         assert_eq!(a, b);
         assert_ne!(a, c);
         assert_eq!(a.len(), 40);
+    }
+
+    #[test]
+    fn nameless_magnet_links_are_named_after_their_info_hash() {
+        let hex = "0123456789abcdef0123456789abcdef01234567";
+        let named = format!("magnet:?xt=urn:btih:{hex}&dn=Some%20Name");
+        assert_eq!(name_nameless_magnet(&named), named);
+        assert_eq!(
+            name_nameless_magnet(&format!("magnet:?xt=urn:btih:{hex}&tr=udp%3A%2F%2Fx%3A1")),
+            format!("magnet:?xt=urn:btih:{hex}&tr=udp%3A%2F%2Fx%3A1&dn={hex}")
+        );
+        // A name that cleans up to nothing is no name.
+        assert_eq!(
+            name_nameless_magnet(&format!("magnet:?dn=..&xt=urn:btih:{hex}")),
+            format!("magnet:?xt=urn:btih:{hex}&dn={hex}")
+        );
+        assert_eq!(name_nameless_magnet("not a magnet"), "not a magnet");
     }
 }
