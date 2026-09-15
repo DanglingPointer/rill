@@ -5,6 +5,8 @@ mod engine;
 mod listener;
 mod logging;
 mod storage;
+#[cfg(test)]
+mod test_support;
 mod torrent_paths;
 mod torrent_row;
 mod torrents;

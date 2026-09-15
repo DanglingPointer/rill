@@ -490,4 +490,148 @@ mod tests {
         Database::open(&path).unwrap();
         let _ = std::fs::remove_file(path);
     }
+
+    fn torrent(hash: &str, state: &str) -> SavedTorrent {
+        let mut torrent = SavedTorrent::new(
+            hash.to_string(),
+            format!("name of {hash}"),
+            format!("magnet:?xt=urn:btih:{hash}"),
+            state.to_string(),
+            10,
+            100,
+            "/downloads".into(),
+        );
+        torrent.total_pieces = 4;
+        torrent.downloaded_pieces = 1;
+        torrent
+    }
+
+    fn open(name: &str) -> (Database, crate::test_support::ScratchDir) {
+        let dir = crate::test_support::ScratchDir::new(name);
+        (Database::open(dir.path().join("torrents.db")).unwrap(), dir)
+    }
+
+    fn state_of(db: &Database, hash: &str) -> String {
+        db.load_torrent(hash).unwrap().unwrap().state
+    }
+
+    #[test]
+    fn a_saved_torrent_loads_back_as_it_was() {
+        let (db, _dir) = open("round-trip");
+        let mut saved = torrent("aa", "paused");
+        saved.sequential = true;
+        db.save_torrent(&saved).unwrap();
+
+        let loaded = db.load_torrent("aa").unwrap().unwrap();
+        assert_eq!(
+            (&loaded.name, &loaded.uri, &loaded.state, &loaded.output_dir),
+            (&saved.name, &saved.uri, &saved.state, &saved.output_dir)
+        );
+        assert_eq!(
+            (
+                loaded.downloaded,
+                loaded.total,
+                loaded.total_pieces,
+                loaded.downloaded_pieces
+            ),
+            (10, 100, 4, 1)
+        );
+        assert_eq!((loaded.added_at, loaded.sequential), (saved.added_at, true));
+        assert!(db.load_torrent("bb").unwrap().is_none());
+        assert_eq!(db.load_torrents().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn progress_completion_names_and_sequential_are_kept() {
+        let (db, _dir) = open("updates");
+        db.save_torrent(&torrent("aa", "downloading")).unwrap();
+
+        db.update_torrent_state("aa", "paused", 50, 100, 4, 2, 7)
+            .unwrap();
+        let loaded = db.load_torrent("aa").unwrap().unwrap();
+        assert_eq!((loaded.state.as_str(), loaded.downloaded), ("paused", 50));
+        assert_eq!((loaded.downloaded_pieces, loaded.last_active), (2, 7));
+
+        db.update_torrent_name("aa", "Real Name").unwrap();
+        db.update_torrent_sequential("aa", true).unwrap();
+        db.mark_completed("aa", 9).unwrap();
+        let loaded = db.load_torrent("aa").unwrap().unwrap();
+        assert_eq!(loaded.name, "Real Name");
+        assert!(loaded.sequential);
+        assert_eq!(
+            (loaded.state.as_str(), loaded.completed_at),
+            ("completed", Some(9))
+        );
+    }
+
+    #[test]
+    fn pausing_everything_leaves_finished_torrents_alone() {
+        let (db, _dir) = open("pause-all");
+        for (hash, state) in [("aa", "downloading"), ("bb", "completed"), ("cc", "error")] {
+            db.save_torrent(&torrent(hash, state)).unwrap();
+        }
+        db.pause_all_torrents().unwrap();
+        assert_eq!(state_of(&db, "aa"), "paused");
+        assert_eq!(state_of(&db, "bb"), "completed");
+        assert_eq!(state_of(&db, "cc"), "error");
+    }
+
+    #[test]
+    fn a_torrent_is_rekeyed_unless_its_new_key_is_taken() {
+        let (db, _dir) = open("rekey");
+        db.save_torrent(&torrent("old", "paused")).unwrap();
+        assert!(db.migrate_torrent_hash("old", "new").unwrap());
+        assert!(db.load_torrent("old").unwrap().is_none());
+        assert!(db.load_torrent("new").unwrap().is_some());
+
+        db.save_torrent(&torrent("other", "completed")).unwrap();
+        assert!(!db.migrate_torrent_hash("other", "new").unwrap());
+        assert_eq!(state_of(&db, "other"), "completed");
+        assert_eq!(state_of(&db, "new"), "paused");
+
+        db.delete_torrent("new").unwrap();
+        assert!(db.load_torrent("new").unwrap().is_none());
+    }
+
+    #[test]
+    fn settings_are_kept_and_unreadable_ones_fall_back_to_defaults() {
+        let (db, _dir) = open("settings");
+        let defaults = AppSettings::default();
+        assert_eq!(
+            db.load_settings().max_active_downloads,
+            defaults.max_active_downloads
+        );
+
+        let mut settings = db.load_settings();
+        settings.max_active_downloads = 5;
+        settings.pwp_port = 51_000;
+        settings.log_level = "debug".into();
+        settings.window_maximized = true;
+        db.save_settings(&settings).unwrap();
+        let loaded = db.load_settings();
+        assert_eq!((loaded.max_active_downloads, loaded.pwp_port), (5, 51_000));
+        assert_eq!(
+            (loaded.log_level.as_str(), loaded.window_maximized),
+            ("debug", true)
+        );
+        assert_eq!(db.get_pwp_port(), 51_000);
+
+        db.set_setting("pwp_port", "not a port").unwrap();
+        db.set_setting("max_active_downloads", "").unwrap();
+        let loaded = db.load_settings();
+        assert_eq!(loaded.pwp_port, defaults.pwp_port);
+        assert_eq!(loaded.max_active_downloads, defaults.max_active_downloads);
+        assert_eq!(db.get_pwp_port(), 0);
+    }
+
+    #[test]
+    fn a_fresh_database_has_the_current_schema() {
+        let (db, _dir) = open("fresh");
+        let version: i32 = db
+            .conn
+            .query_row("SELECT version FROM schema_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        assert!(column_exists(&db.conn, "torrents", "sequential"));
+    }
 }

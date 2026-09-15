@@ -225,3 +225,57 @@ impl Storage {
             .map_err(|e| format!("Failed to save settings: {}", e))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn open(name: &str) -> (Storage, crate::test_support::ScratchDir) {
+        let dir = crate::test_support::ScratchDir::new(name);
+        (Storage::open(dir.path().join("torrents.db")).unwrap(), dir)
+    }
+
+    #[test]
+    fn queued_jobs_run_in_order_and_a_flush_waits_for_them() {
+        let (storage, _dir) = open("storage-order");
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        for n in 0..20 {
+            let seen = seen.clone();
+            storage.execute(move |_| seen.lock().unwrap().push(n));
+        }
+        storage.flush_blocking();
+        assert_eq!(*seen.lock().unwrap(), (0..20).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn a_read_sees_the_writes_queued_before_it() {
+        let (storage, _dir) = open("storage-read");
+        let torrent = SavedTorrent::new(
+            "aa".into(),
+            "name".into(),
+            "uri".into(),
+            "paused".into(),
+            0,
+            0,
+            "/downloads".into(),
+        );
+        storage.execute(move |s| s.save_torrent(&torrent).unwrap());
+        let loaded = block_on(storage.query(|s| s.load_torrent("aa")));
+        assert!(loaded.unwrap().unwrap().is_some());
+    }
+
+    #[test]
+    fn a_job_that_panics_does_not_stop_the_worker() {
+        let (storage, _dir) = open("storage-panic");
+        storage.execute(|_| panic!("a job gone wrong"));
+        let answer = block_on(storage.query(|_| 42));
+        assert_eq!(answer, Ok(42));
+    }
+
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(future)
+    }
+}

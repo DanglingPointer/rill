@@ -37,6 +37,8 @@ Before a change goes in:
                              go through
     src/torrent_paths.rs     where a torrent's content is, kept inside the download folder
     src/tray.rs              the StatusNotifier icon
+    src/test_support.rs      what the tests share: scratch directories, a made-up .torrent,
+                             an engine with its runtimes and database
     third_party/mtorrent-core  the patched mtorrent-core, see its PATCHES.md
 
 Widgets are GObject subclasses with composite templates from the Blueprint files. The

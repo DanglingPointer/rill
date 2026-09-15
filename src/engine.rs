@@ -720,7 +720,147 @@ fn hex(hash: &[u8; 20]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{listening_port, name_nameless_magnet, torrent_id};
+    use std::time::Duration;
+
+    use super::{TorrentUiState, listening_port, lock_recover, name_nameless_magnet, torrent_id};
+    use crate::test_support::{Harness, TestTorrent, closed_addr};
+
+    const WAIT: Duration = Duration::from_secs(20);
+
+    /// A magnet link whose only peer does not exist: the torrent runs and gets nowhere.
+    fn magnet_to_nowhere(n: u8) -> String {
+        let hash: String = std::iter::repeat_n(format!("{n:02x}"), 20).collect();
+        format!("magnet:?xt=urn:btih:{hash}&x.pe={}", closed_addr())
+    }
+
+    #[test]
+    fn a_started_torrent_runs_until_paused_and_again_once_resumed() {
+        let h = Harness::new("engine-toggle", 0);
+        let hash = h.engine.start(
+            "Name".into(),
+            magnet_to_nowhere(1),
+            h.output_dir(),
+            false,
+            h.tx.clone(),
+        );
+        let first = h.wait_for_update(&hash, WAIT, |_| true);
+        assert_eq!(first.state, TorrentUiState::Downloading);
+        assert_eq!(first.name, "Name");
+        assert!(h.engine.is_active(&hash));
+
+        h.engine.toggle(&hash);
+        assert!(!h.engine.is_active(&hash));
+        h.wait_for_update(&hash, WAIT, |u| u.state == TorrentUiState::Paused);
+
+        h.engine.toggle(&hash);
+        assert!(h.engine.is_active(&hash));
+        h.wait_for_update(&hash, WAIT, |u| u.state == TorrentUiState::Downloading);
+
+        h.engine.stop(&hash);
+        assert!(!h.engine.is_active(&hash));
+        // A stopped torrent is gone: there is nothing to resume.
+        h.engine.toggle(&hash);
+        assert!(!h.engine.is_active(&hash));
+    }
+
+    #[test]
+    fn starting_a_running_torrent_again_starts_nothing_new() {
+        let h = Harness::new("engine-restart", 0);
+        let uri = magnet_to_nowhere(2);
+        let hash = h.engine.start(
+            String::new(),
+            uri.clone(),
+            h.output_dir(),
+            false,
+            h.tx.clone(),
+        );
+        let again = h
+            .engine
+            .start(String::new(), uri, h.output_dir(), true, h.tx.clone());
+        assert_eq!(hash, again);
+        // The second start only reports the new sequential setting.
+        h.wait_for_update(&hash, WAIT, |u| u.sequential);
+
+        h.engine.pause_all();
+        assert!(!h.engine.is_active(&hash));
+        h.engine.toggle(&hash);
+        assert!(h.engine.is_active(&hash));
+    }
+
+    #[test]
+    fn a_torrent_added_paused_starts_when_resumed() {
+        let h = Harness::new("engine-paused", 0);
+        let hash = h.engine.add_paused(
+            "Paused".into(),
+            magnet_to_nowhere(3),
+            h.output_dir(),
+            false,
+            h.tx.clone(),
+        );
+        let update = h.wait_for_update(&hash, WAIT, |_| true);
+        assert_eq!(update.state, TorrentUiState::Paused);
+        assert!(!h.engine.is_active(&hash));
+
+        h.engine.toggle(&hash);
+        assert!(h.engine.is_active(&hash));
+    }
+
+    #[test]
+    fn a_failed_torrent_can_be_retried() {
+        let h = Harness::new("engine-failed", 0);
+        let hash = h.engine.start(
+            String::new(),
+            magnet_to_nowhere(4),
+            h.output_dir(),
+            false,
+            h.tx.clone(),
+        );
+        h.engine.mark_failed(&hash);
+        assert!(!h.engine.is_active(&hash));
+        h.engine.toggle(&hash);
+        assert!(h.engine.is_active(&hash));
+    }
+
+    #[test]
+    fn running_torrents_get_consecutive_ports_and_a_new_one_the_first_free() {
+        let h = Harness::new("engine-ports", 47_000);
+        let start = |n| {
+            h.engine.start(
+                String::new(),
+                magnet_to_nowhere(n),
+                h.output_dir(),
+                false,
+                h.tx.clone(),
+            )
+        };
+        let port = |hash: &str| lock_recover(&h.engine.active, "active map")[hash].port;
+
+        let hashes: Vec<String> = [5, 6, 7].into_iter().map(start).collect();
+        let ports: Vec<u16> = hashes.iter().map(|hash| port(hash)).collect();
+        assert_eq!(ports, [47_000, 47_001, 47_002]);
+
+        // Paused, the first torrent gives its port up to the next one to start.
+        h.engine.toggle(&hashes[0]);
+        let fourth = start(8);
+        assert_eq!(port(&fourth), 47_000);
+        h.engine.toggle(&hashes[0]);
+        assert_eq!(port(&hashes[0]), 47_003);
+    }
+
+    #[test]
+    fn a_torrent_file_shows_its_name_and_size_at_once() {
+        let h = Harness::new("engine-file", 0);
+        let torrent = TestTorrent::create(h.dir.path(), "From A File", 100_000, 16 * 1024);
+        let uri = torrent.metainfo_path.to_string_lossy().into_owned();
+        let hash = h
+            .engine
+            .start("stem".into(), uri, h.output_dir(), false, h.tx.clone());
+        assert_eq!(hash, torrent.hex_hash());
+        let update = h.wait_for_update(&hash, WAIT, |u| u.total > 0);
+        assert_eq!(update.name, "From A File");
+        assert_eq!(update.total, 100_000);
+        assert_eq!(update.total_pieces, 7);
+    }
 
     #[test]
     fn running_torrents_listen_on_ports_of_their_own() {
