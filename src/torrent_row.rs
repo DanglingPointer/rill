@@ -237,10 +237,7 @@ impl TorrentRow {
         let Some(update) = self.latest() else {
             return;
         };
-        // The torrent's own folder when it has one, the download folder otherwise.
-        let dir = crate::torrent_paths::contained_path(&update.output_dir, &update.name)
-            .filter(|dir| dir.is_dir())
-            .unwrap_or(update.output_dir);
+        let dir = crate::torrent_paths::folder_to_open(&update.uri, &update.output_dir);
         let window = self.root().and_downcast::<RillWindow>();
         gtk::FileLauncher::new(Some(&gio::File::for_path(&dir))).launch(
             window.clone().as_ref(),

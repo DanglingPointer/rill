@@ -20,6 +20,14 @@ pub fn content_path(uri: &str, output_dir: &Path) -> Option<PathBuf> {
         .and_then(|stem| contained_path(output_dir, stem))
 }
 
+/// The folder to show for a torrent: the one its content is in, or `output_dir` until that
+/// exists.
+pub fn folder_to_open(uri: &str, output_dir: &Path) -> PathBuf {
+    content_path(uri, output_dir)
+        .filter(|path| path.is_dir())
+        .unwrap_or_else(|| output_dir.to_path_buf())
+}
+
 /// The .torrent file of a torrent: the one it was added from, or for a magnet link the one
 /// mtorrent saves in `output_dir` once it has fetched the metadata, named like the content.
 pub fn metainfo_path(uri: &str, output_dir: &Path) -> Option<PathBuf> {
@@ -84,6 +92,21 @@ mod tests {
             content_path(uri, output_dir),
             Some(output_dir.join("Show _ Season 1"))
         );
+    }
+
+    #[test]
+    fn folder_to_open_is_the_content_folder_once_it_exists() {
+        let output_dir = std::env::temp_dir().join(format!("rill-open-{}", std::process::id()));
+        // A single-file torrent: the file is film.mkv, its folder is named after the
+        // .torrent file.
+        let uri = "/tmp/source/film.torrent";
+        std::fs::create_dir_all(&output_dir).unwrap();
+        assert_eq!(folder_to_open(uri, &output_dir), output_dir);
+
+        std::fs::create_dir(output_dir.join("film")).unwrap();
+        let folder = folder_to_open(uri, &output_dir);
+        std::fs::remove_dir_all(&output_dir).unwrap();
+        assert_eq!(folder, output_dir.join("film"));
     }
 
     #[test]
