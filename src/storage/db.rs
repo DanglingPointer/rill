@@ -73,10 +73,6 @@ impl Database {
         let result = (|| {
             if from_version < 2 {
                 self.conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_active_downloads', '3')", [])?;
-                self.conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_active_uploads', '3')", [])?;
-                self.conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('global_download_limit', '0')", [])?;
-                self.conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('global_upload_limit', '0')", [])?;
-                self.conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('seeding_ratio_limit', '1.0')", [])?;
             }
             if from_version < 3 {
                 self.conn.execute(
