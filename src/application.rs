@@ -79,11 +79,10 @@ mod imp {
 
         fn shutdown(&self) {
             if let Some(session) = self.session.get() {
-                log::info!("Shutting down; pausing all torrents");
+                log::info!("Shutting down; stopping all torrents");
+                // The database keeps every torrent as it was, so that the ones that were
+                // downloading, or waiting to, start again on the next run.
                 session.engine.pause_all();
-                if let Err(e) = session.storage.pause_all_torrents() {
-                    log::error!("Failed to record the paused torrents: {e}");
-                }
                 // Let every queued write reach the disk before the process exits.
                 session.storage.flush_blocking();
             }

@@ -201,13 +201,6 @@ impl Storage {
             .map_err(|e| format!("Failed to update torrent sequential flag: {}", e))
     }
 
-    /// Pause all downloading torrents
-    pub fn pause_all_torrents(&self) -> Result<(), String> {
-        self.db()
-            .pause_all_torrents()
-            .map_err(|e| format!("Failed to pause all torrents: {}", e))
-    }
-
     /// Load app settings
     pub fn load_settings(&self) -> AppSettings {
         self.db().load_settings()

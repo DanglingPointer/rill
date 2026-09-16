@@ -81,8 +81,8 @@ fn main() -> glib::ExitCode {
             return glib::ExitCode::FAILURE;
         }
     }
-    // Exit without unwinding: dropping the runtimes would wait on transfers that are
-    // already paused and persisted by the shutdown handler.
+    // Exit without unwinding: dropping the runtimes would wait on transfers the
+    // shutdown handler has already stopped.
     std::process::exit(app.run().into())
 }
 

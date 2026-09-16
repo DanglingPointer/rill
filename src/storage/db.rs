@@ -332,15 +332,6 @@ impl Database {
     }
 
     /// Pause all downloading torrents
-    pub fn pause_all_torrents(&self) -> SqlResult<()> {
-        log::info!("Pausing all downloading torrents in database");
-        self.conn.execute(
-            "UPDATE torrents SET state = 'paused' WHERE state = 'downloading'",
-            [],
-        )?;
-        Ok(())
-    }
-
     /// Get setting value by key
     pub fn get_setting(&self, key: &str) -> SqlResult<Option<String>> {
         let value: Option<String> = self
@@ -562,18 +553,6 @@ mod tests {
             (loaded.state.as_str(), loaded.completed_at),
             ("completed", Some(9))
         );
-    }
-
-    #[test]
-    fn pausing_everything_leaves_finished_torrents_alone() {
-        let (db, _dir) = open("pause-all");
-        for (hash, state) in [("aa", "downloading"), ("bb", "completed"), ("cc", "error")] {
-            db.save_torrent(&torrent(hash, state)).unwrap();
-        }
-        db.pause_all_torrents().unwrap();
-        assert_eq!(state_of(&db, "aa"), "paused");
-        assert_eq!(state_of(&db, "bb"), "completed");
-        assert_eq!(state_of(&db, "cc"), "error");
     }
 
     #[test]

@@ -51,7 +51,9 @@ Trackers the trackers the torrent names.
 
 On a desktop with a system tray, closing the window hides it and the transfers go on; the
 tray icon brings the window back or quits. Without a tray, closing the window quits.
-Quitting pauses every transfer, and they come back paused the next time Rill starts.
+Quitting stops every transfer, and the next time Rill starts each torrent picks up where
+it left off: what was downloading, or waiting its turn, goes on, and what you paused
+stays paused.
 
 ## Where things are kept
 
