@@ -107,6 +107,15 @@ mod imp {
             klass.install_action("win.delete-selected", None, |win, _, _| {
                 win.confirm_delete(win.selected_hashes());
             });
+            klass.install_action("win.pause-all", None, |win, _, _| {
+                win.for_each_in_state(
+                    TorrentUiState::Downloading,
+                    super::RillWindow::pause_torrent,
+                );
+            });
+            klass.install_action("win.resume-all", None, |win, _, _| {
+                win.for_each_in_state(TorrentUiState::Paused, super::RillWindow::resume_torrent);
+            });
 
             let hash = Some(glib::VariantTy::STRING);
             klass.install_action("win.pause-torrent", hash, |win, _, v| {
@@ -473,6 +482,21 @@ impl RillWindow {
     }
 
     // Transfers
+
+    /// Runs `action` for every torrent the window shows in `state`.
+    fn for_each_in_state(&self, state: TorrentUiState, action: impl Fn(&Self, &str)) {
+        let hashes: Vec<String> = self
+            .imp()
+            .rows
+            .borrow()
+            .iter()
+            .filter(|(_, row)| row.state() == state)
+            .map(|(hash, _)| hash.clone())
+            .collect();
+        for hash in hashes {
+            action(self, &hash);
+        }
+    }
 
     fn pause_torrent(&self, hash: &str) {
         let imp = self.imp();
@@ -852,6 +876,9 @@ impl RillWindow {
     /// Shows the sections that have rows to show, or the page saying there are none.
     fn update_sections(&self) {
         let imp = self.imp();
+        let any_in = |state| imp.rows.borrow().values().any(|row| row.state() == state);
+        self.action_set_enabled("win.pause-all", any_in(TorrentUiState::Downloading));
+        self.action_set_enabled("win.resume-all", any_in(TorrentUiState::Paused));
         let visible_rows = |list: &gtk::ListBox| {
             let mut child = list.first_child();
             while let Some(widget) = child {

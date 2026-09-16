@@ -76,6 +76,7 @@ mod imp {
                 row.set_selected(true);
             });
             klass.install_action("row.open-folder", None, |row, _, _| row.open_folder());
+            klass.install_action("row.copy-link", None, |row, _, _| row.copy_link());
             klass.install_action("row.menu", None, |row, _, _| {
                 let width = row.width() as f64;
                 row.popup_menu(width / 2.0, row.height() as f64 / 2.0);
@@ -253,6 +254,19 @@ impl TorrentRow {
         );
     }
 
+    /// Puts the torrent's magnet link on the clipboard, made up from what it was added
+    /// from: a magnet link as it is, a .torrent file as a link to its info hash.
+    fn copy_link(&self) {
+        let Some(update) = self.latest() else {
+            return;
+        };
+        let link = magnet_link(&update);
+        self.clipboard().set_text(&link);
+        if let Some(window) = self.root().and_downcast::<RillWindow>() {
+            window.show_toast(&gettext("Magnet link copied"));
+        }
+    }
+
     fn popup_menu(&self, x: f64, y: f64) {
         let imp = self.imp();
         let model = if self.selection_mode() {
@@ -270,6 +284,20 @@ impl TorrentRow {
         menu.set_menu_model(Some(&model));
         menu.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         menu.popup();
+    }
+}
+
+/// The magnet link of a torrent: the one it was added from, or one made of its info hash
+/// and name.
+fn magnet_link(update: &UiUpdate) -> String {
+    if update.uri.starts_with("magnet:") {
+        return update.uri.clone();
+    }
+    let link = format!("magnet:?xt=urn:btih:{}", update.info_hash);
+    if update.name.is_empty() {
+        link
+    } else {
+        format!("{link}&dn={}", urlencoding::encode(&update.name))
     }
 }
 
@@ -297,4 +325,34 @@ fn status_text(update: &UiUpdate) -> String {
             .replace("%d", &update.peers.to_string()),
     );
     parts.join(" · ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn update(uri: &str, name: &str) -> UiUpdate {
+        UiUpdate::idle(
+            "aabbccdd".into(),
+            name.into(),
+            TorrentUiState::Paused,
+            std::path::PathBuf::from("/tmp"),
+            uri.into(),
+            false,
+        )
+    }
+
+    #[test]
+    fn a_magnet_link_is_copied_as_it_came_and_a_file_as_its_info_hash() {
+        let magnet = "magnet:?xt=urn:btih:aabbccdd&dn=Name";
+        assert_eq!(magnet_link(&update(magnet, "Name")), magnet);
+        assert_eq!(
+            magnet_link(&update("/tmp/film.torrent", "Some Film")),
+            "magnet:?xt=urn:btih:aabbccdd&dn=Some%20Film"
+        );
+        assert_eq!(
+            magnet_link(&update("/tmp/film.torrent", "")),
+            "magnet:?xt=urn:btih:aabbccdd"
+        );
+    }
 }

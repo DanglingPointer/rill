@@ -18,6 +18,18 @@ menu add_menu {
 menu primary_menu {
   section {
     item {
+      label: _("_Pause All");
+      action: "win.pause-all";
+    }
+
+    item {
+      label: _("_Resume All");
+      action: "win.resume-all";
+    }
+  }
+
+  section {
+    item {
       label: _("_Select Torrents");
       action: "win.select";
     }
