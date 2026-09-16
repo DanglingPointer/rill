@@ -89,6 +89,15 @@ impl Torrents {
         }
     }
 
+    /// Hands a paused torrent to the queue, which starts it when a slot is free.
+    pub fn enqueue(&mut self, hash: &str) {
+        if let Some(entry) = self.entries.get_mut(hash)
+            && entry.state == TorrentUiState::Paused
+        {
+            entry.queued = true;
+        }
+    }
+
     /// The user paused or resumed the torrent: the queue no longer holds it.
     pub fn leave_queue(&mut self, hash: &str) {
         if let Some(entry) = self.entries.get_mut(hash) {
@@ -287,6 +296,24 @@ mod tests {
         torrents.leave_queue("a");
         assert_eq!(torrents.stored_state("a", Paused), "paused");
         assert_eq!(torrents.plan_queue(3, running(&[])), plan(&[], &[]));
+    }
+
+    #[test]
+    fn torrents_handed_to_the_queue_start_only_as_far_as_the_limit_allows() {
+        let mut torrents = Torrents::default();
+        torrents.add("running", Downloading, 1);
+        for (hash, added) in [("a", 2), ("b", 3), ("c", 4)] {
+            torrents.add(hash, Paused, added);
+            torrents.enqueue(hash);
+        }
+        torrents.add("done", Completed, 5);
+        torrents.enqueue("done");
+
+        assert_eq!(torrents.stored_state("b", Paused), "downloading");
+        assert_eq!(
+            torrents.plan_queue(2, running(&["running"])),
+            plan(&[], &["a"])
+        );
     }
 
     #[test]

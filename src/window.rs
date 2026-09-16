@@ -117,9 +117,7 @@ mod imp {
                     super::RillWindow::pause_torrent,
                 );
             });
-            klass.install_action("win.resume-all", None, |win, _, _| {
-                win.for_each_in_state(TorrentUiState::Paused, super::RillWindow::resume_torrent);
-            });
+            klass.install_action("win.resume-all", None, |win, _, _| win.resume_all());
 
             let hash = Some(glib::VariantTy::STRING);
             klass.install_action("win.pause-torrent", hash, |win, _, v| {
@@ -663,6 +661,25 @@ impl RillWindow {
         for hash in hashes {
             action(self, &hash);
         }
+    }
+
+    /// Resumes every paused torrent through the queue: those over the download limit wait
+    /// for a slot, rather than start only to be paused again straight away.
+    fn resume_all(&self) {
+        self.for_each_in_state(TorrentUiState::Paused, |window, hash| {
+            window.imp().torrents.borrow_mut().enqueue(hash);
+            // Saved as waiting to download, so that a restart starts it too.
+            let latest = window
+                .imp()
+                .rows
+                .borrow()
+                .get(hash)
+                .and_then(TorrentRow::latest);
+            if let Some(update) = latest {
+                window.persist(&update);
+            }
+        });
+        self.check_queue();
     }
 
     fn pause_torrent(&self, hash: &str) {
