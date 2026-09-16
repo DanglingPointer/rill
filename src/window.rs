@@ -167,6 +167,9 @@ mod imp {
             let obj = self.obj();
             obj.update_selection_actions();
             obj.setup_drop_target();
+            // Blueprint cannot do this: without it the bar captures keys with nowhere to
+            // put them, and GTK says so on every keystroke.
+            self.search_bar.connect_entry(&*self.search_entry);
             self.search_bar
                 .connect_search_mode_enabled_notify(glib::clone!(
                     #[weak]
