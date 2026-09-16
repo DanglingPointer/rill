@@ -9,6 +9,10 @@ use crate::logging;
 use crate::storage::{AppSettings, Storage};
 use crate::window::RillWindow;
 
+/// The port the spin row offers until the user picks another; the port BitTorrent is
+/// known by, which a torrent counts up from.
+const DEFAULT_PORT: u16 = 6881;
+
 mod imp {
     use super::*;
 
@@ -20,10 +24,15 @@ mod imp {
         #[template_child]
         pub max_downloads_row: TemplateChild<adw::SpinRow>,
         #[template_child]
+        pub auto_port_row: TemplateChild<adw::SwitchRow>,
+        #[template_child]
         pub port_row: TemplateChild<adw::SpinRow>,
         #[template_child]
         pub log_level_row: TemplateChild<adw::ComboRow>,
 
+        /// Set while the rows are filled in from the settings, so that nothing is
+        /// written back.
+        pub filling: std::cell::Cell<bool>,
         pub window: glib::WeakRef<RillWindow>,
         pub storage: OnceCell<Storage>,
     }
@@ -68,8 +77,28 @@ mod imp {
 
         #[template_callback]
         fn on_port_changed(&self) {
+            if self.filling.get() {
+                return;
+            }
             let value = self.port_row.value() as u16;
             self.obj().save(|s| s.pwp_port = value);
+        }
+
+        #[template_callback]
+        fn on_auto_port_changed(&self) {
+            if self.filling.get() {
+                return;
+            }
+            let automatic = self.auto_port_row.is_active();
+            // Zero is how a port of the torrent's own is stored; the row below says what
+            // torrents count up from instead, and is worth showing only then.
+            let port = if automatic {
+                0
+            } else {
+                self.port_row.value() as u16
+            };
+            self.port_row.set_visible(!automatic);
+            self.obj().save(|s| s.pwp_port = port);
         }
 
         #[template_callback]
@@ -101,7 +130,16 @@ impl PreferencesDialog {
             .set_subtitle(&settings.download_folder_path().to_string_lossy());
         imp.max_downloads_row
             .set_value(settings.max_active_downloads as f64);
-        imp.port_row.set_value(settings.pwp_port as f64);
+        imp.filling.set(true);
+        let automatic = settings.pwp_port == 0;
+        imp.auto_port_row.set_active(automatic);
+        imp.port_row.set_visible(!automatic);
+        imp.port_row.set_value(if automatic {
+            DEFAULT_PORT
+        } else {
+            settings.pwp_port
+        } as f64);
+        imp.filling.set(false);
         let levels = [
             gettext("Errors"),
             gettext("Warnings"),

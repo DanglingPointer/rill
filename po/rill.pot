@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill 0.2.0\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-15 09:10+0300\n"
+"POT-Creation-Date: 2026-09-16 09:00+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -158,12 +158,12 @@ msgstr ""
 msgid "Add Magnet Link"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:122 src/window.rs:347 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:122 src/window.rs:341 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:140 src/window.rs:342
+#: src/dialogs/add_torrent.rs:140 src/window.rs:336
 #, no-c-format
 msgid "Torrent Files"
 msgstr ""
@@ -189,110 +189,110 @@ msgstr ""
 msgid "“%s” is not a torrent file"
 msgstr ""
 
-#: src/dialogs/preferences.rs:106
+#: src/dialogs/preferences.rs:144
 #, no-c-format
 msgid "Errors"
 msgstr ""
 
-#: src/dialogs/preferences.rs:107
+#: src/dialogs/preferences.rs:145
 #, no-c-format
 msgid "Warnings"
 msgstr ""
 
-#: src/dialogs/preferences.rs:108
+#: src/dialogs/preferences.rs:146
 #, no-c-format
 msgid "Information"
 msgstr ""
 
-#: src/dialogs/preferences.rs:109
+#: src/dialogs/preferences.rs:147
 #, no-c-format
 msgid "Debugging"
 msgstr ""
 
-#: src/dialogs/preferences.rs:110
+#: src/dialogs/preferences.rs:148
 #, no-c-format
 msgid "Everything"
 msgstr ""
 
-#: src/dialogs/preferences.rs:136
+#: src/dialogs/preferences.rs:174
 #, no-c-format
 msgid "Could not save the setting"
 msgstr ""
 
-#: src/dialogs/preferences.rs:144
+#: src/dialogs/preferences.rs:182
 #, no-c-format
 msgid "Choose the Download Folder"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:127
+#: src/dialogs/torrent_info.rs:137
 #, no-c-format
 msgid "No peers connected"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:129
+#: src/dialogs/torrent_info.rs:139
 #, no-c-format
 msgid "No trackers"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:150
+#: src/dialogs/torrent_info.rs:160
 #, no-c-format
 msgid "Source copied"
 msgstr ""
 
 #. Translators: %s is a percentage, "42.0".
-#: src/dialogs/torrent_info.rs:196
+#: src/dialogs/torrent_info.rs:206
 #, no-c-format
 msgid "%s%"
 msgstr ""
 
 #. Translators: state and percentage done, "Downloading · 42.0%".
-#: src/dialogs/torrent_info.rs:200
+#: src/dialogs/torrent_info.rs:210
 #, no-c-format
 msgid "Downloading · %s"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:202
+#: src/dialogs/torrent_info.rs:212
 #, no-c-format
 msgid "Paused · %s"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:203
+#: src/dialogs/torrent_info.rs:213
 #, no-c-format
 msgid "Completed"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:204
+#: src/dialogs/torrent_info.rs:214
 #, no-c-format
 msgid "Failed"
 msgstr ""
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:209 src/torrent_row.rs:279
+#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:279
 #, no-c-format
 msgid "%1 of %2"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:213 src/torrent_row.rs:286
+#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:286
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:230
+#: src/dialogs/torrent_info.rs:240
 #, no-c-format
 msgid "None"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:231
+#: src/dialogs/torrent_info.rs:241
 #, no-c-format
 msgid "Unknown"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:270
+#: src/dialogs/torrent_info.rs:291
 #, no-c-format
 msgid "Could not save the sequential setting"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:301
+#: src/dialogs/torrent_info.rs:322
 #, no-c-format
 msgid "Encrypted connection"
 msgstr ""
@@ -375,95 +375,95 @@ msgstr ""
 msgid "%1d %2h"
 msgstr ""
 
-#: src/window.rs:192
+#: src/window.rs:184
 #, no-c-format
 msgid "Rill is still running"
 msgstr ""
 
-#: src/window.rs:194
+#: src/window.rs:186
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
 "Rill."
 msgstr ""
 
-#: src/window.rs:361
+#: src/window.rs:355
 #, no-c-format
 msgid "Only local files can be added"
 msgstr ""
 
-#: src/window.rs:470
+#: src/window.rs:464
 #, no-c-format
 msgid "Select Torrents"
 msgstr ""
 
-#: src/window.rs:472
+#: src/window.rs:466
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:535
+#: src/window.rs:527
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr ""
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:537
+#: src/window.rs:529
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr ""
 
-#: src/window.rs:541
+#: src/window.rs:533
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr ""
 
-#: src/window.rs:543
+#: src/window.rs:535
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:551
+#: src/window.rs:543
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr ""
 
-#: src/window.rs:559 ui/add_torrent_dialog.ui:21 ui/window.ui:64
+#: src/window.rs:551 ui/add_torrent_dialog.ui:21 ui/window.ui:64
 #, no-c-format
 msgid "_Cancel"
 msgstr ""
 
-#: src/window.rs:560
+#: src/window.rs:552
 #, no-c-format
 msgid "_Delete"
 msgstr ""
 
-#: src/window.rs:628
+#: src/window.rs:617
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr ""
 
-#: src/window.rs:637
+#: src/window.rs:626
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr ""
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:720
+#: src/window.rs:709
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr ""
 
-#: src/window.rs:732
+#: src/window.rs:721
 #, no-c-format
 msgid "Download Complete"
 msgstr ""
 
-#: src/window.rs:823
+#: src/window.rs:814
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr ""
@@ -518,24 +518,31 @@ msgid "Network"
 msgstr ""
 
 #: ui/preferences_dialog.ui:54
-msgid "Listening Port"
+msgid "Automatic Port"
 msgstr ""
 
 #: ui/preferences_dialog.ui:55
-msgid ""
-"Torrents started from now on take one port each, counting up from this one. "
-"0 gives each torrent a port derived from it."
+msgid "Every torrent listens on a port derived from it"
 msgstr ""
 
-#: ui/preferences_dialog.ui:71
+#: ui/preferences_dialog.ui:61
+msgid "Listening Port"
+msgstr ""
+
+#: ui/preferences_dialog.ui:62
+msgid ""
+"Torrents started from now on take one port each, counting up from this one"
+msgstr ""
+
+#: ui/preferences_dialog.ui:78
 msgid "Troubleshooting"
 msgstr ""
 
-#: ui/preferences_dialog.ui:74
+#: ui/preferences_dialog.ui:81
 msgid "Log Level"
 msgstr ""
 
-#: ui/preferences_dialog.ui:75
+#: ui/preferences_dialog.ui:82
 msgid "How much Rill writes to its standard error output"
 msgstr ""
 

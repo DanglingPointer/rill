@@ -41,13 +41,19 @@ template $RillPreferencesDialog: Adw.PreferencesDialog {
     Adw.PreferencesGroup {
       title: _("Network");
 
+      Adw.SwitchRow auto_port_row {
+        title: _("Automatic Port");
+        subtitle: _("Every torrent listens on a port derived from it");
+        notify::active => $on_auto_port_changed() swapped;
+      }
+
       Adw.SpinRow port_row {
         title: _("Listening Port");
-        subtitle: _("Torrents started from now on take one port each, counting up from this one. 0 gives each torrent a port derived from it.");
+        subtitle: _("Torrents started from now on take one port each, counting up from this one");
         notify::value => $on_port_changed() swapped;
 
         adjustment: Adjustment {
-          lower: 0;
+          lower: 1024;
           upper: 65535;
           step-increment: 1;
           page-increment: 10;

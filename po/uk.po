@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-15 09:10+0300\n"
+"POT-Creation-Date: 2026-09-16 09:00+0300\n"
 "PO-Revision-Date: 2026-09-14 00:00+0300\n"
 "Last-Translator: sachesi <xsachesi@pm.me>\n"
 "Language-Team: Ukrainian\n"
@@ -198,12 +198,12 @@ msgstr "sachesi <xsachesi@pm.me>"
 msgid "Add Magnet Link"
 msgstr "Додати magnet-посилання"
 
-#: src/dialogs/add_torrent.rs:122 src/window.rs:347 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:122 src/window.rs:341 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr "Додати торент-файл"
 
-#: src/dialogs/add_torrent.rs:140 src/window.rs:342
+#: src/dialogs/add_torrent.rs:140 src/window.rs:336
 #, no-c-format
 msgid "Torrent Files"
 msgstr "Торент-файли"
@@ -229,110 +229,110 @@ msgstr "Це не magnet-посилання"
 msgid "“%s” is not a torrent file"
 msgstr "«%s» не є торент-файлом"
 
-#: src/dialogs/preferences.rs:106
+#: src/dialogs/preferences.rs:144
 #, no-c-format
 msgid "Errors"
 msgstr "Помилки"
 
-#: src/dialogs/preferences.rs:107
+#: src/dialogs/preferences.rs:145
 #, no-c-format
 msgid "Warnings"
 msgstr "Попередження"
 
-#: src/dialogs/preferences.rs:108
+#: src/dialogs/preferences.rs:146
 #, no-c-format
 msgid "Information"
 msgstr "Інформація"
 
-#: src/dialogs/preferences.rs:109
+#: src/dialogs/preferences.rs:147
 #, no-c-format
 msgid "Debugging"
 msgstr "Зневадження"
 
-#: src/dialogs/preferences.rs:110
+#: src/dialogs/preferences.rs:148
 #, no-c-format
 msgid "Everything"
 msgstr "Усе"
 
-#: src/dialogs/preferences.rs:136
+#: src/dialogs/preferences.rs:174
 #, no-c-format
 msgid "Could not save the setting"
 msgstr "Не вдалося зберегти налаштування"
 
-#: src/dialogs/preferences.rs:144
+#: src/dialogs/preferences.rs:182
 #, no-c-format
 msgid "Choose the Download Folder"
 msgstr "Виберіть теку завантажень"
 
-#: src/dialogs/torrent_info.rs:127
+#: src/dialogs/torrent_info.rs:137
 #, no-c-format
 msgid "No peers connected"
 msgstr "Немає підключених пірів"
 
-#: src/dialogs/torrent_info.rs:129
+#: src/dialogs/torrent_info.rs:139
 #, no-c-format
 msgid "No trackers"
 msgstr "Трекерів немає"
 
-#: src/dialogs/torrent_info.rs:150
+#: src/dialogs/torrent_info.rs:160
 #, no-c-format
 msgid "Source copied"
 msgstr "Джерело скопійовано"
 
 #. Translators: %s is a percentage, "42.0".
-#: src/dialogs/torrent_info.rs:196
+#: src/dialogs/torrent_info.rs:206
 #, no-c-format
 msgid "%s%"
 msgstr "%s%"
 
 #. Translators: state and percentage done, "Downloading · 42.0%".
-#: src/dialogs/torrent_info.rs:200
+#: src/dialogs/torrent_info.rs:210
 #, no-c-format
 msgid "Downloading · %s"
 msgstr "Завантаження · %s"
 
-#: src/dialogs/torrent_info.rs:202
+#: src/dialogs/torrent_info.rs:212
 #, no-c-format
 msgid "Paused · %s"
 msgstr "Призупинено · %s"
 
-#: src/dialogs/torrent_info.rs:203
+#: src/dialogs/torrent_info.rs:213
 #, no-c-format
 msgid "Completed"
 msgstr "Завершено"
 
-#: src/dialogs/torrent_info.rs:204
+#: src/dialogs/torrent_info.rs:214
 #, no-c-format
 msgid "Failed"
 msgstr "Помилка"
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:209 src/torrent_row.rs:279
+#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:279
 #, no-c-format
 msgid "%1 of %2"
 msgstr "%1 з %2"
 
-#: src/dialogs/torrent_info.rs:213 src/torrent_row.rs:286
+#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:286
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr "Очікування метаданих"
 
-#: src/dialogs/torrent_info.rs:230
+#: src/dialogs/torrent_info.rs:240
 #, no-c-format
 msgid "None"
 msgstr "Немає"
 
-#: src/dialogs/torrent_info.rs:231
+#: src/dialogs/torrent_info.rs:241
 #, no-c-format
 msgid "Unknown"
 msgstr "Невідомо"
 
-#: src/dialogs/torrent_info.rs:270
+#: src/dialogs/torrent_info.rs:291
 #, no-c-format
 msgid "Could not save the sequential setting"
 msgstr "Не вдалося зберегти налаштування послідовного завантаження"
 
-#: src/dialogs/torrent_info.rs:301
+#: src/dialogs/torrent_info.rs:322
 #, no-c-format
 msgid "Encrypted connection"
 msgstr "Зашифроване з’єднання"
@@ -416,12 +416,12 @@ msgstr "%1 год %2 хв"
 msgid "%1d %2h"
 msgstr "%1 д %2 год"
 
-#: src/window.rs:192
+#: src/window.rs:184
 #, no-c-format
 msgid "Rill is still running"
 msgstr "Rill продовжує працювати"
 
-#: src/window.rs:194
+#: src/window.rs:186
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
@@ -430,17 +430,17 @@ msgstr ""
 "Завантаження тривають у фоні. Скористайтеся значком у системному лотку, щоб "
 "знову відкрити Rill або вийти з нього."
 
-#: src/window.rs:361
+#: src/window.rs:355
 #, no-c-format
 msgid "Only local files can be added"
 msgstr "Можна додавати лише локальні файли"
 
-#: src/window.rs:470
+#: src/window.rs:464
 #, no-c-format
 msgid "Select Torrents"
 msgstr "Вибір торентів"
 
-#: src/window.rs:472
+#: src/window.rs:466
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
@@ -448,23 +448,23 @@ msgstr[0] "Вибрано %d"
 msgstr[1] "Вибрано %d"
 msgstr[2] "Вибрано %d"
 
-#: src/window.rs:535
+#: src/window.rs:527
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr "Видалити торент?"
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:537
+#: src/window.rs:529
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr "«%s» буде вилучено зі списку."
 
-#: src/window.rs:541
+#: src/window.rs:533
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr "Видалити торенти?"
 
-#: src/window.rs:543
+#: src/window.rs:535
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
@@ -472,43 +472,43 @@ msgstr[0] "%d торент буде вилучено зі списку."
 msgstr[1] "%d торенти буде вилучено зі списку."
 msgstr[2] "%d торентів буде вилучено зі списку."
 
-#: src/window.rs:551
+#: src/window.rs:543
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr "Також видалити завантажені файли"
 
-#: src/window.rs:559 ui/add_torrent_dialog.ui:21 ui/window.ui:64
+#: src/window.rs:551 ui/add_torrent_dialog.ui:21 ui/window.ui:64
 #, no-c-format
 msgid "_Cancel"
 msgstr "_Скасувати"
 
-#: src/window.rs:560
+#: src/window.rs:552
 #, no-c-format
 msgid "_Delete"
 msgstr "_Видалити"
 
-#: src/window.rs:628
+#: src/window.rs:617
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr "Не вдалося видалити завантажені файли: %s"
 
-#: src/window.rs:637
+#: src/window.rs:626
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr "Не вдалося знайти завантажені файли"
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:720
+#: src/window.rs:709
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr "Помилка в «%1»: %2"
 
-#: src/window.rs:732
+#: src/window.rs:721
 #, no-c-format
 msgid "Download Complete"
 msgstr "Завантаження завершено"
 
-#: src/window.rs:823
+#: src/window.rs:814
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr "Не вдалося зберегти торент: %s"
@@ -566,26 +566,32 @@ msgid "Network"
 msgstr "Мережа"
 
 #: ui/preferences_dialog.ui:54
+msgid "Automatic Port"
+msgstr "Автоматичний порт"
+
+#: ui/preferences_dialog.ui:55
+msgid "Every torrent listens on a port derived from it"
+msgstr "Кожен торент слухає порт, похідний від нього самого"
+
+#: ui/preferences_dialog.ui:61
 msgid "Listening Port"
 msgstr "Порт прослуховування"
 
-#: ui/preferences_dialog.ui:55
+#: ui/preferences_dialog.ui:62
 msgid ""
-"Torrents started from now on take one port each, counting up from this one. "
-"0 gives each torrent a port derived from it."
+"Torrents started from now on take one port each, counting up from this one"
 msgstr ""
-"Торенти, запущені відтепер, займають по одному порту, починаючи з цього. 0 "
-"дає кожному торенту порт, похідний від нього."
+"Торенти, запущені відтепер, займають по одному порту, починаючи з цього"
 
-#: ui/preferences_dialog.ui:71
+#: ui/preferences_dialog.ui:78
 msgid "Troubleshooting"
 msgstr "Усунення несправностей"
 
-#: ui/preferences_dialog.ui:74
+#: ui/preferences_dialog.ui:81
 msgid "Log Level"
 msgstr "Рівень журналювання"
 
-#: ui/preferences_dialog.ui:75
+#: ui/preferences_dialog.ui:82
 msgid "How much Rill writes to its standard error output"
 msgstr "Скільки Rill пише у стандартний потік помилок"
 

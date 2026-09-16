@@ -57,9 +57,10 @@ Quitting pauses every transfer, and they come back paused the next time Rill sta
 
 Torrents and settings are in `~/.local/share/rill/torrents.db`, with the DHT state and
 copies of added .torrent files beside it. Preferences sets the default download folder,
-the number of simultaneous downloads, the listening port (running torrents take one port
-each, counting up from it; 0 gives each torrent a port derived from it) and how much Rill
-logs to its standard error.
+the number of simultaneous downloads, the listening port and how much Rill logs to its
+standard error. The port is automatic unless you say otherwise: every torrent listens on
+one derived from itself. Turn that off to give a port of your own, which running torrents
+take one each of, counting up from it.
 
 ## Keyboard shortcuts
 
