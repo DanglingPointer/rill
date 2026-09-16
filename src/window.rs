@@ -1211,11 +1211,11 @@ impl RillWindow {
             update.total_pieces as u64,
             update.downloaded_pieces as u64,
         );
-        if !imp
-            .torrents
-            .borrow_mut()
-            .record_snapshot(&update.info_hash, snapshot)
-        {
+        if !imp.torrents.borrow_mut().record_snapshot(
+            &update.info_hash,
+            snapshot,
+            std::time::Instant::now(),
+        ) {
             return;
         }
 

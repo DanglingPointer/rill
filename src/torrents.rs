@@ -3,12 +3,17 @@
 //! queue is decided here, from this alone.
 
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use crate::engine::TorrentUiState;
 
 /// What the database last received for a torrent: state, downloaded, total, total
 /// pieces, downloaded pieces.
 pub type PersistedSnapshot = (&'static str, u64, u64, u64, u64);
+
+/// How often the progress of a running torrent is saved. Every write is synced to disk, and
+/// a download changes its figures every second; the state and the size are saved at once.
+pub const PROGRESS_SAVE_INTERVAL: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 struct Entry {
@@ -19,7 +24,8 @@ struct Entry {
     /// When it was added, then the order this session learnt of it in: the queue starts
     /// the oldest first and pauses the newest first.
     added: (i64, u64),
-    persisted: Option<PersistedSnapshot>,
+    /// What was last sent to the database, and when.
+    persisted: Option<(PersistedSnapshot, Instant)>,
 }
 
 /// The torrents of the window.
@@ -115,16 +121,28 @@ impl Torrents {
         }
     }
 
-    /// Records `snapshot` as sent to the database, and returns whether it changes what the
-    /// database has.
-    pub fn record_snapshot(&mut self, hash: &str, snapshot: PersistedSnapshot) -> bool {
+    /// Records `snapshot`, taken at `now`, as sent to the database, and returns whether it is
+    /// worth sending: it has a new state or size, or new progress that has not been saved for
+    /// [`PROGRESS_SAVE_INTERVAL`].
+    pub fn record_snapshot(
+        &mut self,
+        hash: &str,
+        snapshot: PersistedSnapshot,
+        now: Instant,
+    ) -> bool {
         let Some(entry) = self.entries.get_mut(hash) else {
             return false;
         };
-        if entry.persisted == Some(snapshot) {
-            return false;
+        if let Some((saved, at)) = entry.persisted {
+            let (state, _, total, total_pieces, _) = snapshot;
+            let same_kind = (saved.0, saved.2, saved.3) == (state, total, total_pieces);
+            if saved == snapshot
+                || (same_kind && now.saturating_duration_since(at) < PROGRESS_SAVE_INTERVAL)
+            {
+                return false;
+            }
         }
-        entry.persisted = Some(snapshot);
+        entry.persisted = Some((snapshot, now));
         true
     }
 
@@ -132,7 +150,7 @@ impl Torrents {
     /// sent again. A newer one recorded in the meantime stays.
     pub fn snapshot_failed(&mut self, hash: &str, snapshot: PersistedSnapshot) {
         if let Some(entry) = self.entries.get_mut(hash)
-            && entry.persisted == Some(snapshot)
+            && entry.persisted.is_some_and(|(saved, _)| saved == snapshot)
         {
             entry.persisted = None;
         }
@@ -315,17 +333,41 @@ mod tests {
         torrents.add("a", Downloading, 1);
         let first = ("downloading", 1, 10, 1, 0);
         let second = ("downloading", 5, 10, 1, 0);
+        let now = Instant::now();
+        let later = now + PROGRESS_SAVE_INTERVAL;
 
-        assert!(torrents.record_snapshot("a", first));
-        assert!(!torrents.record_snapshot("a", first));
+        assert!(torrents.record_snapshot("a", first, now));
+        assert!(!torrents.record_snapshot("a", first, later));
         torrents.snapshot_failed("a", first);
-        assert!(torrents.record_snapshot("a", first));
+        assert!(torrents.record_snapshot("a", first, now));
 
         // A failure of an older write does not forget a newer snapshot.
-        assert!(torrents.record_snapshot("a", second));
+        assert!(torrents.record_snapshot("a", second, later));
         torrents.snapshot_failed("a", first);
-        assert!(!torrents.record_snapshot("a", second));
+        assert!(!torrents.record_snapshot("a", second, later));
 
-        assert!(!torrents.record_snapshot("unknown", first));
+        assert!(!torrents.record_snapshot("unknown", first, now));
+    }
+
+    #[test]
+    fn progress_is_saved_now_and_then_but_a_new_state_or_size_at_once() {
+        let mut torrents = Torrents::default();
+        torrents.add("a", Downloading, 1);
+        let now = Instant::now();
+        let soon = now + Duration::from_secs(1);
+
+        assert!(torrents.record_snapshot("a", ("downloading", 0, 0, 0, 0), now));
+        // The metadata arrived: the size is new.
+        assert!(torrents.record_snapshot("a", ("downloading", 0, 10, 2, 0), now));
+        assert!(!torrents.record_snapshot("a", ("downloading", 4, 10, 2, 1), soon));
+        assert!(torrents.record_snapshot("a", ("paused", 4, 10, 2, 1), soon));
+        assert!(!torrents.record_snapshot("a", ("paused", 4, 10, 2, 1), soon));
+        assert!(torrents.record_snapshot("a", ("downloading", 4, 10, 2, 1), soon));
+        assert!(!torrents.record_snapshot("a", ("downloading", 6, 10, 2, 1), soon));
+        assert!(torrents.record_snapshot(
+            "a",
+            ("downloading", 6, 10, 2, 1),
+            soon + PROGRESS_SAVE_INTERVAL
+        ));
     }
 }
