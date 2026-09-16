@@ -388,7 +388,9 @@ impl TorrentEngine {
         let stop_flag = Arc::new(AtomicU8::new(Stop::RUNNING));
         let port = listening_port(
             self.storage.pwp_port(),
+            &sanitize_magnet_dn(&torrent.uri),
             active.values().map(|torrent| torrent.port),
+            port_is_free,
         );
         let cmd = StartCmd {
             info_hash: info_hash.to_string(),
@@ -540,17 +542,44 @@ impl TorrentEngine {
 }
 
 /// The port a torrent about to run listens on: the first from `base` up that no running
-/// torrent has, or 0, for mtorrent to derive one from the torrent, when `base` is 0. Each
-/// torrent needs a port of its own: mtorrent's listeners share a port, and the system would
-/// hand a connection for one torrent to any of them.
-fn listening_port(base: u16, taken: impl IntoIterator<Item = u16>) -> u16 {
-    if base == 0 {
-        return 0;
-    }
+/// torrent has and nothing else holds. When `base` is 0 the search starts from the port
+/// mtorrent would derive from `uri`, so that a torrent keeps its port from run to run while
+/// it can. 0, for mtorrent to derive one after all, when every port is taken.
+///
+/// Each torrent needs a port of its own: mtorrent's listeners share a TCP port, and the
+/// system would hand a connection for one torrent to any of them. Nor may the port be held
+/// by anything else: mtorrent binds uTP on the same port over UDP, and runs the torrent
+/// without it when that fails. The DHT node holds such a port, and so does, for a moment,
+/// the task a paused or restarted torrent is leaving behind.
+fn listening_port(
+    base: u16,
+    uri: &str,
+    taken: impl IntoIterator<Item = u16>,
+    is_free: impl Fn(u16) -> bool,
+) -> u16 {
+    use mtorrent::utils::re_exports::mtorrent_utils::net::port_from_hash;
+
     let taken: std::collections::HashSet<u16> = taken.into_iter().collect();
-    (base..=u16::MAX)
-        .find(|port| !taken.contains(port))
+    let usable = |port: &u16| *port != 0 && !taken.contains(port) && is_free(*port);
+    if base != 0 {
+        return (base..=u16::MAX).find(usable).unwrap_or(0);
+    }
+    let derived = port_from_hash(&uri);
+    (derived..=u16::MAX)
+        .chain(DYNAMIC_PORTS_START..derived)
+        .find(usable)
         .unwrap_or(0)
+}
+
+/// Where the ports mtorrent derives from a torrent begin.
+const DYNAMIC_PORTS_START: u16 = 49152;
+
+/// Whether a torrent could listen on `port`, over TCP and over UDP.
+fn port_is_free(port: u16) -> bool {
+    use std::net::{Ipv4Addr, TcpListener, UdpSocket};
+
+    UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok()
+        && TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok()
 }
 
 /// Runs one torrent on the engine thread until it ends or is cancelled, and tells the
@@ -604,8 +633,8 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
         output_dir: output_dir.clone(),
         config_dir: shared.config_dir,
         use_upnp: false,
-        // Port 0 means "unset": let mtorrent pick a stable port (port_from_hash)
-        // instead of binding an ephemeral one and announcing port 0 to trackers.
+        // 0 only when no port was free: mtorrent derives one then, rather than binding an
+        // ephemeral one and announcing port 0 to trackers.
         pwp_port: (pwp_port != 0).then_some(pwp_port),
         bind_interface: None,
         // Fixed for this run: the engine restarts the torrent when the switch moves.
@@ -958,12 +987,18 @@ mod tests {
         let ports: Vec<u16> = hashes.iter().map(|hash| port(hash)).collect();
         assert_eq!(ports, [47_000, 47_001, 47_002]);
 
-        // Paused, the first torrent gives its port up to the next one to start.
+        // Paused, the first torrent gives its port up, though its task may hold it a moment
+        // longer; resumed, it takes one that neither the others nor that task have.
         h.engine.toggle(&hashes[0]);
         let fourth = start(8);
-        assert_eq!(port(&fourth), 47_000);
-        h.engine.toggle(&hashes[0]);
-        assert_eq!(port(&hashes[0]), 47_003);
+        let resumed = {
+            h.engine.toggle(&hashes[0]);
+            port(&hashes[0])
+        };
+        let mut all = vec![ports[1], ports[2], port(&fourth), resumed];
+        all.sort_unstable();
+        all.dedup();
+        assert_eq!(all.len(), 4, "ports shared: {all:?}");
     }
 
     #[test]
@@ -983,10 +1018,29 @@ mod tests {
 
     #[test]
     fn running_torrents_listen_on_ports_of_their_own() {
-        assert_eq!(listening_port(0, [0, 0]), 0);
-        assert_eq!(listening_port(6881, []), 6881);
-        assert_eq!(listening_port(6881, [6881, 6883]), 6882);
-        assert_eq!(listening_port(u16::MAX, [u16::MAX]), 0);
+        let free = |_| true;
+        assert_eq!(listening_port(6881, "", [], free), 6881);
+        assert_eq!(listening_port(6881, "", [6881, 6883], free), 6882);
+        assert_eq!(listening_port(u16::MAX, "", [u16::MAX], free), 0);
+        // Held elsewhere, by the DHT node for one.
+        assert_eq!(listening_port(6881, "", [6882], |port| port != 6881), 6883);
+    }
+
+    #[test]
+    fn an_automatic_port_is_the_derived_one_while_that_is_free() {
+        use mtorrent::utils::re_exports::mtorrent_utils::net::port_from_hash;
+
+        let uri = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567";
+        let derived = port_from_hash(&uri);
+        assert_eq!(listening_port(0, uri, [], |_| true), derived);
+        let next = if derived == u16::MAX {
+            49152
+        } else {
+            derived + 1
+        };
+        assert_eq!(listening_port(0, uri, [derived], |_| true), next);
+        assert_eq!(listening_port(0, uri, [], |port| port != derived), next);
+        assert_eq!(listening_port(0, uri, [], |_| false), 0);
     }
 
     #[test]
