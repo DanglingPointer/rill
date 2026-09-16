@@ -35,6 +35,13 @@
     <control>touch</control>
   </supports>
   <releases>
+    <release version="0.3.0" date="2026-09-16">
+      <description>
+        <p>Torrents pick up where they left off after Rill restarts. The list can be ordered by name, size or progress, every torrent can be paused or resumed at once, a torrent's magnet link can be copied, and its download folder can be changed after it was added, moving the files that are already there. Rill warns when a torrent needs more room than its folder has.</p>
+        <p>A torrent whose files were removed is paused and marked as having files not found, instead of showing as finished, and resuming it downloads them again. A torrent you start while the download limit is reached runs anyway, and the download started most recently waits in the queue, marked as queued. Resume All starts torrents only as far as the limit allows.</p>
+        <p>Rill now uses mtorrent 0.6.0. Each running torrent listens on a port of its own, the DHT keeps working when another client holds port 6881, and magnet links without a name get a folder of their own. The window no longer redraws on every update, which could stall the display with many torrents and peers.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-09-14">
       <description>
         <p>The application id is now io.github.sachesi.rill. The dialogs adapt to narrow windows and open as bottom sheets on phones, and the details of a torrent move their tabs to the bottom when there is no room for them at the top.</p>
