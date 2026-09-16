@@ -71,6 +71,12 @@ impl Torrents {
         );
     }
 
+    /// When the torrent was added, and where it came in this session, which is what the
+    /// list falls back to ordering by.
+    pub fn added(&self, hash: &str) -> (i64, u64) {
+        self.entries.get(hash).map_or((0, 0), |entry| entry.added)
+    }
+
     pub fn set_state(&mut self, hash: &str, state: TorrentUiState) {
         if let Some(entry) = self.entries.get_mut(hash) {
             entry.state = state;

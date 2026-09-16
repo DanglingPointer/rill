@@ -29,6 +29,36 @@ menu primary_menu {
   }
 
   section {
+    submenu {
+      label: _("Sort _By");
+
+      section {
+        item {
+          label: _("_Date Added");
+          action: "win.sort";
+          target: "added";
+        }
+
+        item {
+          label: _("_Name");
+          action: "win.sort";
+          target: "name";
+        }
+
+        item {
+          label: _("_Size");
+          action: "win.sort";
+          target: "size";
+        }
+
+        item {
+          label: _("_Progress");
+          action: "win.sort";
+          target: "progress";
+        }
+      }
+    }
+
     item {
       label: _("_Select Torrents");
       action: "win.select";

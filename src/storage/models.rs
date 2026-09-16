@@ -62,6 +62,8 @@ pub struct AppSettings {
     pub log_level: String,
     pub max_active_downloads: i32,
     pub pwp_port: u16,
+    /// What the torrent list is ordered by; see `window::SortOrder`.
+    pub sort_order: String,
 }
 
 impl Default for AppSettings {
@@ -74,6 +76,7 @@ impl Default for AppSettings {
             log_level: "info".to_string(),
             max_active_downloads: 3,
             pwp_port: 0,
+            sort_order: "added".to_string(),
         }
     }
 }

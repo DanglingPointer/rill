@@ -54,6 +54,9 @@ mod imp {
 
         #[property(get, set = Self::set_selection_mode)]
         pub selection_mode: Cell<bool>,
+        /// What the list is ordered by, as `SortOrder::key` spells it.
+        #[property(get, set = Self::set_sort)]
+        pub sort: RefCell<String>,
 
         pub engine: OnceCell<Rc<TorrentEngine>>,
         pub storage: OnceCell<Storage>,
@@ -107,6 +110,7 @@ mod imp {
             klass.install_action("win.delete-selected", None, |win, _, _| {
                 win.confirm_delete(win.selected_hashes());
             });
+            klass.install_property_action("win.sort", "sort");
             klass.install_action("win.pause-all", None, |win, _, _| {
                 win.for_each_in_state(
                     TorrentUiState::Downloading,
@@ -240,7 +244,91 @@ mod imp {
             obj.update_selection_actions();
             obj.notify_selection_mode();
         }
+
+        fn set_sort(&self, order: String) {
+            if *self.sort.borrow() == order {
+                return;
+            }
+            self.sort.replace(order.clone());
+            let obj = self.obj();
+            obj.sort_rows();
+            obj.notify_sort();
+            // Not set yet while the window is being built from the stored settings.
+            if let Some(storage) = self.storage.get() {
+                let storage = storage.clone();
+                storage.execute(move |s| {
+                    let mut settings = s.load_settings();
+                    settings.sort_order = order;
+                    if let Err(e) = s.save_settings(&settings) {
+                        log::warn!("Failed to save the sort order: {e}");
+                    }
+                });
+            }
+        }
     }
+}
+
+/// What the torrent list is ordered by.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SortOrder {
+    /// Oldest first, which is the order the queue starts them in.
+    #[default]
+    Added,
+    Name,
+    /// Largest first.
+    Size,
+    /// Closest to done first.
+    Progress,
+}
+
+impl SortOrder {
+    /// The order as the settings and the menu spell it.
+    pub fn key(self) -> &'static str {
+        match self {
+            SortOrder::Added => "added",
+            SortOrder::Name => "name",
+            SortOrder::Size => "size",
+            SortOrder::Progress => "progress",
+        }
+    }
+
+    /// The order `key` names; anything unknown is the default one.
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "name" => SortOrder::Name,
+            "size" => SortOrder::Size,
+            "progress" => SortOrder::Progress,
+            _ => SortOrder::Added,
+        }
+    }
+}
+
+/// What one torrent is ordered by.
+struct SortKey {
+    name: String,
+    total: u64,
+    downloaded: u64,
+    /// When it was added, and in which place this session learnt of it.
+    added: (i64, u64),
+}
+
+/// Orders two torrents, the one added first coming before the other when they are
+/// otherwise equal.
+fn compare(order: SortOrder, a: &SortKey, b: &SortKey) -> std::cmp::Ordering {
+    let fraction = |key: &SortKey| {
+        if key.total > 0 {
+            key.downloaded as f64 / key.total as f64
+        } else {
+            0.0
+        }
+    };
+    match order {
+        SortOrder::Added => std::cmp::Ordering::Equal,
+        SortOrder::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        SortOrder::Size => b.total.cmp(&a.total),
+        SortOrder::Progress => fraction(b).total_cmp(&fraction(a)),
+    }
+    .then_with(|| a.added.cmp(&b.added))
 }
 
 glib::wrapper! {
@@ -264,6 +352,9 @@ impl RillWindow {
         let settings = storage.load_settings();
         imp.download_limit
             .set(settings.max_active_downloads.max(1) as usize);
+        // Before the storage is set, so that reading the order does not save it again.
+        window.set_sort(SortOrder::from_key(&settings.sort_order).key());
+        window.install_sort();
         window.set_default_size(settings.window_width, settings.window_height);
         if settings.window_maximized {
             window.maximize();
@@ -276,6 +367,56 @@ impl RillWindow {
         window.restore_torrents(saved);
         window.listen(rx);
         window
+    }
+
+    /// Puts the rows of every section in the chosen order.
+    fn sort_rows(&self) {
+        let imp = self.imp();
+        for list in [
+            imp.downloading_list.get(),
+            imp.paused_list.get(),
+            imp.finished_list.get(),
+        ] {
+            list.invalidate_sort();
+        }
+    }
+
+    /// Teaches each section how to order its rows. The order itself is read afresh on
+    /// every comparison, so changing it only needs the rows sorted again.
+    fn install_sort(&self) {
+        let imp = self.imp();
+        for list in [
+            imp.downloading_list.get(),
+            imp.paused_list.get(),
+            imp.finished_list.get(),
+        ] {
+            list.set_sort_func(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                gtk::Ordering::Equal,
+                move |a, b| {
+                    let order = SortOrder::from_key(&window.sort());
+                    match (window.sort_key(a), window.sort_key(b)) {
+                        (Some(a), Some(b)) => compare(order, &a, &b).into(),
+                        _ => gtk::Ordering::Equal,
+                    }
+                }
+            ));
+        }
+    }
+
+    /// What `row` is ordered by, or `None` when it is not a torrent row.
+    fn sort_key(&self, row: &gtk::ListBoxRow) -> Option<SortKey> {
+        let row = row.downcast_ref::<TorrentRow>()?;
+        let hash = row.info_hash();
+        let latest = row.latest();
+        Some(SortKey {
+            name: row.name(),
+            total: latest.as_ref().map_or(0, |update| update.total),
+            downloaded: latest.as_ref().map_or(0, |update| update.downloaded),
+            added: self.imp().torrents.borrow().added(&hash),
+        })
     }
 
     fn engine(&self) -> &TorrentEngine {
@@ -803,6 +944,9 @@ impl RillWindow {
             self.list_for(update.state).append(&row);
             self.update_sections();
             self.check_queue();
+        } else if let Some(list) = row.parent().and_downcast::<gtk::ListBox>() {
+            // The name, the size and the progress are all orders the list can be in.
+            list.invalidate_sort();
         }
     }
 
@@ -1052,6 +1196,77 @@ impl RillWindow {
         for hash in &plan.start {
             log::info!("Starting queued torrent {hash}");
             engine.toggle(hash);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SortKey, SortOrder, compare};
+    use std::cmp::Ordering;
+
+    fn key(name: &str, total: u64, downloaded: u64, added: i64) -> SortKey {
+        SortKey {
+            name: name.to_string(),
+            total,
+            downloaded,
+            added: (added, added as u64),
+        }
+    }
+
+    #[test]
+    fn an_order_falls_back_to_the_one_the_torrents_were_added_in() {
+        let old = key("Zulu", 100, 50, 1);
+        let new = key("Alpha", 100, 50, 2);
+
+        assert_eq!(compare(SortOrder::Added, &old, &new), Ordering::Less);
+        assert_eq!(compare(SortOrder::Name, &old, &new), Ordering::Greater);
+        // Same name, same size, same progress: the older one comes first.
+        let same = key("Zulu", 100, 50, 3);
+        for order in [
+            SortOrder::Added,
+            SortOrder::Name,
+            SortOrder::Size,
+            SortOrder::Progress,
+        ] {
+            assert_eq!(compare(order, &old, &same), Ordering::Less, "{order:?}");
+        }
+    }
+
+    #[test]
+    fn the_biggest_and_the_most_complete_torrents_come_first() {
+        let big = key("Big", 900, 90, 1);
+        let small = key("Small", 100, 90, 2);
+
+        assert_eq!(compare(SortOrder::Size, &big, &small), Ordering::Less);
+        // 10% against 90%.
+        assert_eq!(
+            compare(SortOrder::Progress, &big, &small),
+            Ordering::Greater
+        );
+
+        // A torrent whose size is not known yet is last by size and by progress.
+        let unknown = key("Unknown", 0, 0, 3);
+        assert_eq!(
+            compare(SortOrder::Size, &unknown, &small),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare(SortOrder::Progress, &unknown, &big),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn an_unknown_stored_order_is_the_default_one() {
+        assert_eq!(SortOrder::from_key("nonsense"), SortOrder::Added);
+        for order in [
+            SortOrder::Added,
+            SortOrder::Name,
+            SortOrder::Size,
+            SortOrder::Progress,
+        ] {
+            assert_eq!(SortOrder::from_key(order.key()), order);
         }
     }
 }

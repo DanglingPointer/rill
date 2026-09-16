@@ -387,6 +387,10 @@ impl Database {
             max_active_downloads: parsed(&map, "max_active_downloads")
                 .unwrap_or(defaults.max_active_downloads),
             pwp_port: parsed(&map, "pwp_port").unwrap_or(defaults.pwp_port),
+            sort_order: map
+                .get("sort_order")
+                .cloned()
+                .unwrap_or(defaults.sort_order),
         }
     }
 
@@ -404,6 +408,7 @@ impl Database {
                 &settings.max_active_downloads.to_string(),
             )?;
             self.set_setting("pwp_port", &settings.pwp_port.to_string())?;
+            self.set_setting("sort_order", &settings.sort_order)?;
             Ok(())
         })();
         match result {
@@ -585,6 +590,7 @@ mod tests {
         settings.max_active_downloads = 5;
         settings.pwp_port = 51_000;
         settings.log_level = "debug".into();
+        settings.sort_order = "size".into();
         settings.window_maximized = true;
         db.save_settings(&settings).unwrap();
         let loaded = db.load_settings();
@@ -593,6 +599,7 @@ mod tests {
             (loaded.log_level.as_str(), loaded.window_maximized),
             ("debug", true)
         );
+        assert_eq!(loaded.sort_order, "size");
         assert_eq!(db.get_pwp_port(), 51_000);
 
         db.set_setting("pwp_port", "not a port").unwrap();
