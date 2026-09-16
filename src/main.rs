@@ -39,6 +39,8 @@ fn main() -> glib::ExitCode {
         .filter_module("mtorrent_core::utp::udp", log::LevelFilter::Off)
         .init();
 
+    raise_open_file_limit();
+
     // The peer and storage runtimes run on detached threads; a panic there would
     // otherwise only reach stderr, not the log.
     let default_hook = std::panic::take_hook();
@@ -142,6 +144,45 @@ fn start_session() -> Result<Session, String> {
         storage,
         saved: saved.into(),
     })
+}
+
+/// Most the soft limit on open files is raised to, whatever the hard limit: the kernel
+/// allows no more by default anyway.
+const OPEN_FILES_CEILING: libc::rlim_t = 1 << 20;
+
+/// Raises the soft limit on open files as far as the hard limit allows. A desktop session
+/// starts programs with a soft limit of 1024, and every peer connection is a file: a few
+/// busy torrents reach it. Beyond it the torrents fail to connect, and so does the graphics
+/// driver, which needs files of its own for each frame, reports itself out of memory, and
+/// leaves the window waiting on a frame forever.
+fn raise_open_file_limit() {
+    let mut limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: `limit` is a valid rlimit for getrlimit to fill in.
+    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) } != 0 {
+        log::warn!(
+            "Could not read the open file limit: {}",
+            std::io::Error::last_os_error()
+        );
+        return;
+    }
+    let wanted = limit.rlim_max.min(OPEN_FILES_CEILING);
+    if limit.rlim_cur >= wanted {
+        return;
+    }
+    let previous = limit.rlim_cur;
+    limit.rlim_cur = wanted;
+    // SAFETY: `limit` is a valid rlimit, its soft value no higher than its hard one.
+    if unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &limit) } == 0 {
+        log::info!("Raised the open file limit from {previous} to {wanted}");
+    } else {
+        log::warn!(
+            "Could not raise the open file limit from {previous}: {}",
+            std::io::Error::last_os_error()
+        );
+    }
 }
 
 /// The UDP port for the DHT node: the usual 6881, or the next free one when another client
@@ -258,6 +299,39 @@ unsafe fn init_locale() {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn the_open_file_limit_is_raised_to_the_hard_one() {
+        let read = || {
+            let mut limit = libc::rlimit {
+                rlim_cur: 0,
+                rlim_max: 0,
+            };
+            assert_eq!(
+                unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) },
+                0
+            );
+            limit
+        };
+        let original = read();
+        let wanted = original.rlim_max.min(OPEN_FILES_CEILING);
+        // A soft limit as a desktop session sets it, though never below what the other
+        // tests running alongside have open.
+        let low = libc::rlimit {
+            rlim_cur: 1024.min(wanted),
+            rlim_max: original.rlim_max,
+        };
+        assert_eq!(unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &low) }, 0);
+
+        raise_open_file_limit();
+        let raised = read();
+        assert_eq!(
+            unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &original) },
+            0
+        );
+        assert_eq!(raised.rlim_cur, wanted);
+        assert_eq!(raised.rlim_max, original.rlim_max);
+    }
 
     #[test]
     fn dht_port_skips_ports_in_use() {
