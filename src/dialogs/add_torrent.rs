@@ -1,7 +1,7 @@
 //! Adds a torrent from a magnet link or a .torrent file, with the folder to save it to
 //! and whether to start at once.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -11,6 +11,7 @@ use gettextrs::gettext;
 use gtk::{gio, glib};
 use mtorrent::utils::re_exports::mtorrent_core::input::{MagnetLink, Metainfo};
 
+use crate::util::format_size;
 use crate::window::RillWindow;
 
 mod imp {
@@ -37,10 +38,14 @@ mod imp {
         pub start_row: TemplateChild<adw::SwitchRow>,
         #[template_child]
         pub sequential_row: TemplateChild<adw::SwitchRow>,
+        #[template_child]
+        pub space_warning: TemplateChild<gtk::Label>,
 
         pub window: glib::WeakRef<RillWindow>,
         pub file: RefCell<Option<PathBuf>>,
         pub folder: RefCell<PathBuf>,
+        /// What the chosen .torrent file says it needs, once it is known.
+        pub needed_bytes: Cell<u64>,
     }
 
     #[glib::object_subclass]
@@ -121,6 +126,9 @@ impl AddTorrentDialog {
         let imp = self.imp();
         self.set_title(&gettext("Add Torrent File"));
         imp.magnet_group.set_visible(false);
+        imp.needed_bytes
+            .set(Metainfo::from_file(path).map_or(0, |metainfo| content_size(&metainfo)));
+        self.check_space();
         imp.file_row
             .set_subtitle(&path.file_name().unwrap_or_default().to_string_lossy());
         imp.file.replace(Some(path.to_path_buf()));
@@ -133,6 +141,30 @@ impl AddTorrentDialog {
             .folder_row
             .set_subtitle(&folder.to_string_lossy());
         self.imp().folder.replace(folder);
+        self.check_space();
+    }
+
+    /// Says so when the chosen folder has less room than the torrent needs. Only a
+    /// warning: the folder may well have grown by the time the download gets there, and
+    /// a magnet link does not say how big it is until its metadata arrives.
+    fn check_space(&self) {
+        let imp = self.imp();
+        let needed = imp.needed_bytes.get();
+        let free = free_space(&imp.folder.borrow());
+        let short = match (needed, free) {
+            (0, _) | (_, None) => false,
+            (needed, Some(free)) => needed > free,
+        };
+        imp.space_warning.set_visible(short);
+        if short {
+            // Translators: %1 is what a torrent needs, %2 what the folder has left,
+            // both sizes like "4.0 GiB".
+            imp.space_warning.set_text(
+                &gettext("Not enough space in this folder: %1 needed, %2 free")
+                    .replace("%1", &format_size(needed))
+                    .replace("%2", &format_size(free.unwrap_or(0))),
+            );
+        }
     }
 
     fn choose_file(&self) {
@@ -241,6 +273,25 @@ impl AddTorrentDialog {
 
 /// The name a magnet link gives its torrent, as mtorrent reads it; empty when it has
 /// none, until the metadata arrives.
+/// How much room a torrent's content needs: its single file, or all of them together.
+/// `Metainfo::size` is the size of the metainfo itself, which is not this.
+fn content_size(metainfo: &Metainfo) -> u64 {
+    if let Some(length) = metainfo.length() {
+        return length as u64;
+    }
+    metainfo
+        .files()
+        .map_or(0, |files| files.map(|(length, _path)| length as u64).sum())
+}
+
+/// The bytes free in the filesystem `folder` is on, or `None` when it cannot be asked.
+fn free_space(folder: &Path) -> Option<u64> {
+    gio::File::for_path(folder)
+        .query_filesystem_info("filesystem::free", gio::Cancellable::NONE)
+        .ok()
+        .map(|info| info.attribute_uint64("filesystem::free"))
+}
+
 fn magnet_name(uri: &str) -> String {
     MagnetLink::from_str(uri)
         .ok()
@@ -318,6 +369,41 @@ fn prepare_torrent_file(file: &Path, data_dir: &Path) -> Option<(String, PathBuf
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn free_space_is_read_for_a_real_folder_and_not_for_a_missing_one() {
+        let free = free_space(&std::env::temp_dir());
+        assert!(free.is_some_and(|free| free > 0), "got {free:?}");
+        assert_eq!(free_space(Path::new("/no/such/folder/here")), None);
+    }
+
+    #[test]
+    fn a_torrent_file_says_how_much_room_its_content_needs() {
+        let dir = std::env::temp_dir().join(format!("rill-space-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let single = dir.join("film.torrent");
+        std::fs::write(
+            &single,
+            b"d4:infod6:lengthi1024e4:name8:film.mkv12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaaee",
+        )
+        .unwrap();
+
+        let multi = dir.join("season.torrent");
+        std::fs::write(
+            &multi,
+            b"d4:infod5:filesld6:lengthi600e4:pathl7:one.mkveed6:lengthi424e4:pathl7:two.mkveee4:name6:season12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaaee",
+        )
+        .unwrap();
+
+        let sizes = [single, multi].map(|path| {
+            Metainfo::from_file(&path)
+                .map(|metainfo| content_size(&metainfo))
+                .ok()
+        });
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(sizes, [Some(1024), Some(1024)]);
+    }
 
     #[test]
     fn magnet_name_is_the_display_name() {

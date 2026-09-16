@@ -89,6 +89,19 @@ template $RillAddTorrentDialog: Adw.Dialog {
           title: _("Sequential Download");
           subtitle: _("Download pieces in order, so the start of a file can be opened early");
         }
+
+        Label space_warning {
+          halign: start;
+          margin-top: 6;
+          margin-start: 12;
+          wrap: true;
+          visible: false;
+
+          styles [
+            "caption",
+            "warning",
+          ]
+        }
       }
     };
   };
