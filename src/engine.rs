@@ -446,8 +446,8 @@ impl TorrentEngine {
         }
     }
 
-    /// Tells a torrent where its content goes from now on. The torrent must not be
-    /// running: a running one keeps the folder it started with.
+    /// Tells a torrent where its content goes from now on. A torrent whose task is
+    /// still running keeps the folder it started with until it runs again.
     pub fn set_output_dir(&self, info_hash: &str, output_dir: PathBuf) {
         log::info!("Torrent {} now downloads to {:?}", info_hash, output_dir);
         for map in [&self.active, &self.saved] {

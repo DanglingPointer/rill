@@ -55,18 +55,19 @@ pub fn contained_path(output_dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 /// Moves a torrent's content, and the .torrent file kept beside it, from `old_dir` to
-/// `new_dir`. Returns whether anything moved. Nothing is moved when something of that
-/// name is already in `new_dir`, and a failure leaves the content where it was.
+/// `new_dir`. Returns whether anything moved. Either everything moves or nothing does:
+/// what is in the way is found before the first move, and a move that fails part of the
+/// way through is undone.
 pub fn move_content(uri: &str, old_dir: &Path, new_dir: &Path) -> std::io::Result<bool> {
     use std::io::{Error, ErrorKind};
 
-    let mut moved = false;
     let pairs = [
         (content_path(uri, old_dir), content_path(uri, new_dir)),
         // For a torrent added as a file this is the file itself, which lives wherever
         // the user keeps it and stays there.
         (metainfo_path(uri, old_dir), metainfo_path(uri, new_dir)),
     ];
+    let mut to_move = Vec::new();
     for (from, to) in pairs {
         let (Some(from), Some(to)) = (from, to) else {
             continue;
@@ -80,11 +81,31 @@ pub fn move_content(uri: &str, old_dir: &Path, new_dir: &Path) -> std::io::Resul
                 format!("{} is already there", to.display()),
             ));
         }
-        std::fs::create_dir_all(new_dir)?;
-        std::fs::rename(&from, &to)?;
-        moved = true;
+        to_move.push((from, to));
     }
-    Ok(moved)
+    if to_move.is_empty() {
+        return Ok(false);
+    }
+
+    std::fs::create_dir_all(new_dir)?;
+    let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (from, to) in to_move {
+        if let Err(e) = std::fs::rename(&from, &to) {
+            for (from, to) in moved {
+                // Back where it was, so that Rill and the disk still agree.
+                if let Err(e) = std::fs::rename(&to, &from) {
+                    log::error!(
+                        "Failed to move {} back to {}: {e}",
+                        to.display(),
+                        from.display()
+                    );
+                }
+            }
+            return Err(e);
+        }
+        moved.push((from, to));
+    }
+    Ok(true)
 }
 
 /// Removes a torrent's content without following a symbolic link at `path`.
@@ -177,6 +198,30 @@ mod tests {
         let err = move_content(uri, &old_dir, &new_dir).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
         assert!(old_dir.join("Show").exists());
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_move_that_cannot_finish_leaves_everything_where_it_was() {
+        let root = std::env::temp_dir().join(format!("rill-move-part-{}", std::process::id()));
+        let (old_dir, new_dir) = (root.join("old"), root.join("new"));
+        let uri = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Show";
+        std::fs::create_dir_all(old_dir.join("Show")).unwrap();
+        std::fs::write(old_dir.join("Show.torrent"), b"metainfo").unwrap();
+        // Something of the metainfo's name is already in the new folder, so the content
+        // must not be moved either.
+        std::fs::create_dir_all(&new_dir).unwrap();
+        std::fs::write(new_dir.join("Show.torrent"), b"older").unwrap();
+
+        let err = move_content(uri, &old_dir, &new_dir).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert!(
+            old_dir.join("Show").is_dir(),
+            "the content was moved anyway"
+        );
+        assert!(old_dir.join("Show.torrent").exists());
+        assert!(!new_dir.join("Show").exists());
 
         std::fs::remove_dir_all(&root).unwrap();
     }

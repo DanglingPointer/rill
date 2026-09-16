@@ -284,12 +284,14 @@ fn content_size(metainfo: &Metainfo) -> u64 {
         .map_or(0, |files| files.map(|(length, _path)| length as u64).sum())
 }
 
-/// The bytes free in the filesystem `folder` is on, or `None` when it cannot be asked.
+/// The bytes free in the filesystem `folder` is on, or `None` when it does not say.
 fn free_space(folder: &Path) -> Option<u64> {
-    gio::File::for_path(folder)
+    let info = gio::File::for_path(folder)
         .query_filesystem_info("filesystem::free", gio::Cancellable::NONE)
-        .ok()
-        .map(|info| info.attribute_uint64("filesystem::free"))
+        .ok()?;
+    // A filesystem that does not report free space would otherwise look full.
+    info.has_attribute("filesystem::free")
+        .then(|| info.attribute_uint64("filesystem::free"))
 }
 
 fn magnet_name(uri: &str) -> String {
