@@ -3,6 +3,7 @@
 //! to it with [`TorrentInfoDialog::apply_update`].
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -22,6 +23,9 @@ use crate::util::{format_eta, format_rate, format_size};
 /// old value: the wait below, plus the time until the restarted torrent sends its first
 /// snapshot, plus room to spare.
 const SEQUENTIAL_GRACE: Duration = Duration::from_secs(4);
+
+/// How long to leave a torrent whose metadata is not there yet before looking again.
+const METADATA_RETRY: Duration = Duration::from_secs(5);
 
 /// How long the switch waits for the user to settle before the engine acts on it. Each
 /// change restarts the torrent, which costs it its peers, so a burst of flicking the
@@ -69,6 +73,10 @@ mod imp {
         #[template_child]
         pub trackers_list: TemplateChild<gtk::ListBox>,
 
+        /// The row shown for each connected peer, kept between snapshots and changed in
+        /// place: rebuilding them every second churned widgets, and with them the
+        /// renderer's textures, for a list that mostly stays the same.
+        pub peer_rows: RefCell<HashMap<String, PeerRow>>,
         pub info_hash: RefCell<String>,
         pub pieces: Rc<RefCell<Vec<u8>>>,
         pub engine: RefCell<Option<Rc<TorrentEngine>>>,
@@ -82,6 +90,11 @@ mod imp {
         pub sequential_changes: Rc<Cell<u64>>,
         pub metadata_loaded: Cell<bool>,
         pub metadata_loading: Cell<bool>,
+        /// When the metadata was last looked for. A magnet link has none until its peers
+        /// send it, and looking on every snapshot means parsing a file every second.
+        pub metadata_tried: Cell<Option<Instant>>,
+        /// The trackers the page already lists, so that the same ones are not rebuilt.
+        pub shown_trackers: RefCell<Vec<String>>,
     }
 
     #[glib::object_subclass]
@@ -295,36 +308,27 @@ impl TorrentInfoDialog {
     }
 
     fn update_peers(&self, peers: &[PeerInfo]) {
-        let list = &self.imp().peers_list;
-        list.remove_all();
+        let imp = self.imp();
+        let list = &imp.peers_list;
+        let mut rows = imp.peer_rows.borrow_mut();
+
+        let connected: std::collections::HashSet<&str> =
+            peers.iter().map(|peer| peer.address.as_str()).collect();
+        rows.retain(|address, row| {
+            let still_here = connected.contains(address.as_str());
+            if !still_here {
+                list.remove(&row.row);
+            }
+            still_here
+        });
+
         for peer in peers {
-            let row = adw::ActionRow::builder()
-                .title(&peer.address)
-                .subtitle(peer.client.as_deref().unwrap_or_default())
-                .use_markup(false)
-                .build();
-            let figures = gtk::Box::builder()
-                .spacing(12)
-                .valign(gtk::Align::Center)
-                .build();
-            for (arrow, rate) in [("↓", peer.speed_down), ("↑", peer.speed_up)] {
-                if rate > 0 {
-                    let label = gtk::Label::builder()
-                        .label(format!("{arrow} {}", format_rate(rate)))
-                        .css_classes(["caption", "dim-label", "numeric"])
-                        .build();
-                    figures.append(&label);
-                }
-            }
-            if peer.encrypted {
-                let icon = gtk::Image::builder()
-                    .icon_name("channel-secure-symbolic")
-                    .tooltip_text(gettext("Encrypted connection"))
-                    .build();
-                figures.append(&icon);
-            }
-            row.add_suffix(&figures);
-            list.append(&row);
+            // A peer that was not there a second ago goes to the end of the list, so the
+            // ones already shown stay where the reader last saw them.
+            let row = rows
+                .entry(peer.address.clone())
+                .or_insert_with(|| PeerRow::new(&peer.address, list));
+            row.show(peer);
         }
     }
 
@@ -332,9 +336,18 @@ impl TorrentInfoDialog {
     /// parsing runs on a worker, once at a time.
     fn load_metadata(&self, update: &UiUpdate) {
         let imp = self.imp();
-        if imp.metadata_loaded.get() || imp.metadata_loading.replace(true) {
+        if imp.metadata_loaded.get() || imp.metadata_loading.get() {
             return;
         }
+        if imp
+            .metadata_tried
+            .get()
+            .is_some_and(|at| at.elapsed() < METADATA_RETRY)
+        {
+            return;
+        }
+        imp.metadata_tried.set(Some(Instant::now()));
+        imp.metadata_loading.set(true);
         let uri = update.uri.clone();
         let output_dir = update.output_dir.clone();
         glib::spawn_future_local(glib::clone!(
@@ -347,8 +360,11 @@ impl TorrentInfoDialog {
                 let imp = dialog.imp();
                 imp.metadata_loading.set(false);
                 let (files, trackers) = loaded;
-                if !trackers.is_empty() || !files.is_empty() {
+                // The borrow ends here: replacing the list below needs it back.
+                let same_trackers = *imp.shown_trackers.borrow() == trackers;
+                if !same_trackers && (!trackers.is_empty() || !files.is_empty()) {
                     dialog.show_trackers(&trackers);
+                    imp.shown_trackers.replace(trackers);
                 }
                 if !files.is_empty() {
                     let items: Vec<FileItem> = files
@@ -373,6 +389,67 @@ impl TorrentInfoDialog {
                 .build();
             list.append(&row);
         }
+    }
+}
+
+/// One peer's row: built once, then told what the peer is doing.
+pub struct PeerRow {
+    row: adw::ActionRow,
+    down: gtk::Label,
+    up: gtk::Label,
+    encrypted: gtk::Image,
+}
+
+impl PeerRow {
+    fn new(address: &str, list: &gtk::ListBox) -> Self {
+        let row = adw::ActionRow::builder()
+            .title(address)
+            .use_markup(false)
+            .build();
+        let figures = gtk::Box::builder()
+            .spacing(12)
+            .valign(gtk::Align::Center)
+            .build();
+        let rate = || {
+            gtk::Label::builder()
+                .css_classes(["caption", "dim-label", "numeric"])
+                .visible(false)
+                .build()
+        };
+        let (down, up) = (rate(), rate());
+        let encrypted = gtk::Image::builder()
+            .icon_name("channel-secure-symbolic")
+            .tooltip_text(gettext("Encrypted connection"))
+            .visible(false)
+            .build();
+        figures.append(&down);
+        figures.append(&up);
+        figures.append(&encrypted);
+        row.add_suffix(&figures);
+        list.append(&row);
+        Self {
+            row,
+            down,
+            up,
+            encrypted,
+        }
+    }
+
+    /// Changes what the row says. Setting a label to what it already holds costs
+    /// nothing, so a peer that has not moved is not redrawn.
+    fn show(&self, peer: &PeerInfo) {
+        self.row
+            .set_subtitle(peer.client.as_deref().unwrap_or_default());
+        for (label, arrow, rate) in [
+            (&self.down, "↓", peer.speed_down),
+            (&self.up, "↑", peer.speed_up),
+        ] {
+            label.set_visible(rate > 0);
+            if rate > 0 {
+                label.set_label(&format!("{arrow} {}", format_rate(rate)));
+            }
+        }
+        self.encrypted.set_visible(peer.encrypted);
     }
 }
 
