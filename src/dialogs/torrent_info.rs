@@ -236,9 +236,13 @@ impl TorrentInfoDialog {
             gettext("Waiting for metadata")
         });
 
-        imp.pieces.replace(update.piece_map.clone());
         imp.piece_map.set_visible(!update.piece_map.is_empty());
-        imp.piece_map.queue_draw();
+        // Drawn again only when it changed; most seconds it has not.
+        let same_pieces = *imp.pieces.borrow() == update.piece_map;
+        if !same_pieces {
+            imp.pieces.replace(update.piece_map.clone());
+            imp.piece_map.queue_draw();
+        }
 
         imp.download_speed_label
             .set_text(&format_rate(update.speed_down));

@@ -405,7 +405,10 @@ impl RillWindow {
                 gtk::Ordering::Equal,
                 move |a, b| {
                     let order = SortOrder::from_key(&window.sort());
-                    match (window.sort_key(a), window.sort_key(b)) {
+                    match (
+                        window.sort_key(a.upcast_ref()),
+                        window.sort_key(b.upcast_ref()),
+                    ) {
                         (Some(a), Some(b)) => compare(order, &a, &b).into(),
                         _ => gtk::Ordering::Equal,
                     }
@@ -415,16 +418,31 @@ impl RillWindow {
     }
 
     /// What `row` is ordered by, or `None` when it is not a torrent row.
-    fn sort_key(&self, row: &gtk::ListBoxRow) -> Option<SortKey> {
+    fn sort_key(&self, row: &gtk::Widget) -> Option<SortKey> {
         let row = row.downcast_ref::<TorrentRow>()?;
-        let hash = row.info_hash();
-        let latest = row.latest();
+        let (downloaded, total) = row.progress();
         Some(SortKey {
             name: row.name(),
-            total: latest.as_ref().map_or(0, |update| update.total),
-            downloaded: latest.as_ref().map_or(0, |update| update.downloaded),
-            added: self.imp().torrents.borrow().added(&hash),
+            total,
+            downloaded,
+            added: self.imp().torrents.borrow().added(&row.info_hash()),
         })
+    }
+
+    /// Whether `row` still sorts between the rows before and after it, which is all that
+    /// can have changed when only its own snapshot is new.
+    fn in_order(&self, row: &TorrentRow) -> bool {
+        let order = SortOrder::from_key(&self.sort());
+        if order == SortOrder::Added {
+            return true;
+        }
+        let Some(key) = self.sort_key(row.upcast_ref()) else {
+            return true;
+        };
+        let before = row.prev_sibling().and_then(|prev| self.sort_key(&prev));
+        let after = row.next_sibling().and_then(|next| self.sort_key(&next));
+        before.is_none_or(|before| compare(order, &before, &key).is_le())
+            && after.is_none_or(|after| compare(order, &key, &after).is_le())
     }
 
     fn engine(&self) -> &TorrentEngine {
@@ -1027,8 +1045,11 @@ impl RillWindow {
             self.list_for(update.state).append(&row);
             self.update_sections();
             self.check_queue();
-        } else if let Some(list) = row.parent().and_downcast::<gtk::ListBox>() {
-            // The name, the size and the progress are all orders the list can be in.
+        } else if !self.in_order(&row)
+            && let Some(list) = row.parent().and_downcast::<gtk::ListBox>()
+        {
+            // Sorting reorders every row and lays the list out again, so it happens only
+            // when this one has moved past a neighbour, not on every snapshot.
             list.invalidate_sort();
         }
     }

@@ -149,6 +149,15 @@ impl TorrentRow {
         self.imp().latest.borrow().clone()
     }
 
+    /// The bytes downloaded and the total, as last shown; zero before any snapshot.
+    pub fn progress(&self) -> (u64, u64) {
+        self.imp()
+            .latest
+            .borrow()
+            .as_ref()
+            .map_or((0, 0), |update| (update.downloaded, update.total))
+    }
+
     pub fn matches(&self, query: &str) -> bool {
         query.is_empty()
             || self.name().to_lowercase().contains(query)
