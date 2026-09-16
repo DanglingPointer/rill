@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill 0.2.0\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-16 09:20+0300\n"
+"POT-Creation-Date: 2026-09-16 10:13+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -158,7 +158,7 @@ msgstr ""
 msgid "Add Magnet Link"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:127 src/window.rs:496 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:127 src/window.rs:515 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr ""
@@ -168,7 +168,7 @@ msgstr ""
 msgid "Not enough space in this folder: %1 needed, %2 free"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:172 src/window.rs:491
+#: src/dialogs/add_torrent.rs:172 src/window.rs:510
 #, no-c-format
 msgid "Torrent Files"
 msgstr ""
@@ -178,7 +178,7 @@ msgstr ""
 msgid "Choose a Torrent File"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:199 src/window.rs:695
+#: src/dialogs/add_torrent.rs:199 src/window.rs:733
 #, no-c-format
 msgid "Choose a Download Folder"
 msgstr ""
@@ -229,116 +229,127 @@ msgstr ""
 msgid "Choose the Download Folder"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:137
+#: src/dialogs/torrent_info.rs:150
 #, no-c-format
 msgid "No peers connected"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:139
+#: src/dialogs/torrent_info.rs:152
 #, no-c-format
 msgid "No trackers"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:160
+#: src/dialogs/torrent_info.rs:173
 #, no-c-format
 msgid "Source copied"
 msgstr ""
 
 #. Translators: %s is a percentage, "42.0".
-#: src/dialogs/torrent_info.rs:206
+#: src/dialogs/torrent_info.rs:219
 #, no-c-format
 msgid "%s%"
 msgstr ""
 
 #. Translators: state and percentage done, "Downloading · 42.0%".
-#: src/dialogs/torrent_info.rs:210
+#: src/dialogs/torrent_info.rs:223
 #, no-c-format
 msgid "Downloading · %s"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:212
+#: src/dialogs/torrent_info.rs:225
 #, no-c-format
 msgid "Paused · %s"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:213
+#: src/dialogs/torrent_info.rs:226
 #, no-c-format
 msgid "Completed"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:214
+#: src/dialogs/torrent_info.rs:227
 #, no-c-format
 msgid "Failed"
 msgstr ""
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:310
+#: src/dialogs/torrent_info.rs:232 src/torrent_row.rs:345
 #, no-c-format
 msgid "%1 of %2"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:317
+#: src/dialogs/torrent_info.rs:236 src/torrent_row.rs:352
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:240
+#: src/dialogs/torrent_info.rs:257
 #, no-c-format
 msgid "None"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:241
+#: src/dialogs/torrent_info.rs:258
 #, no-c-format
 msgid "Unknown"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:291
+#: src/dialogs/torrent_info.rs:308
 #, no-c-format
 msgid "Could not save the sequential setting"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:322
+#: src/dialogs/torrent_info.rs:426
 #, no-c-format
 msgid "Encrypted connection"
 msgstr ""
 
 #. Translators: a torrent without a name yet; %s is the start of its info hash.
-#: src/torrent_row.rs:164
+#: src/torrent_row.rs:175
 #, no-c-format
 msgid "Torrent %s"
 msgstr ""
 
-#: src/torrent_row.rs:188
+#: src/torrent_row.rs:214
 #, no-c-format
 msgid "Pause"
 msgstr ""
 
-#: src/torrent_row.rs:194
+#: src/torrent_row.rs:220
 #, no-c-format
 msgid "Resume"
 msgstr ""
 
-#: src/torrent_row.rs:200 src/torrent_row.rs:206
+#: src/torrent_row.rs:226 src/torrent_row.rs:232
 #, no-c-format
 msgid "Delete"
 msgstr ""
 
-#: src/torrent_row.rs:253
+#: src/torrent_row.rs:279
 #, no-c-format
 msgid "Could not open the folder"
 msgstr ""
 
-#: src/torrent_row.rs:269
+#: src/torrent_row.rs:295
 #, no-c-format
 msgid "Magnet link copied"
 msgstr ""
 
-#: src/torrent_row.rs:318
+#: src/torrent_row.rs:335
+#, no-c-format
+msgid "Files not found"
+msgstr ""
+
+#. Translators: some of a torrents files are gone; %s is how much is left, "1.2 GiB".
+#: src/torrent_row.rs:338
+#, no-c-format
+msgid "Some files not found, %s left"
+msgstr ""
+
+#: src/torrent_row.rs:353
 #, no-c-format
 msgid "Size unknown"
 msgstr ""
 
-#: src/torrent_row.rs:327
+#: src/torrent_row.rs:362
 #, no-c-format
 msgid "%d peer"
 msgid_plural "%d peers"
@@ -385,100 +396,100 @@ msgstr ""
 msgid "%1d %2h"
 msgstr ""
 
-#: src/window.rs:202
+#: src/window.rs:203
 #, no-c-format
 msgid "Rill is still running"
 msgstr ""
 
-#: src/window.rs:204
+#: src/window.rs:205
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
 "Rill."
 msgstr ""
 
-#: src/window.rs:510
+#: src/window.rs:529
 #, no-c-format
 msgid "Only local files can be added"
 msgstr ""
 
-#: src/window.rs:619
+#: src/window.rs:638
 #, no-c-format
 msgid "Select Torrents"
 msgstr ""
 
-#: src/window.rs:621
+#: src/window.rs:640
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:734
+#: src/window.rs:772
 #, no-c-format
 msgid "Could not move the files; the folder is unchanged"
 msgstr ""
 
-#: src/window.rs:772
+#: src/window.rs:810
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr ""
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:774
+#: src/window.rs:812
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr ""
 
-#: src/window.rs:778
+#: src/window.rs:816
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr ""
 
-#: src/window.rs:780
+#: src/window.rs:818
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:788
+#: src/window.rs:826
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr ""
 
-#: src/window.rs:796 ui/add_torrent_dialog.ui:21 ui/window.ui:99
+#: src/window.rs:834 ui/add_torrent_dialog.ui:21 ui/window.ui:99
 #, no-c-format
 msgid "_Cancel"
 msgstr ""
 
-#: src/window.rs:797
+#: src/window.rs:835
 #, no-c-format
 msgid "_Delete"
 msgstr ""
 
-#: src/window.rs:862
+#: src/window.rs:900
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr ""
 
-#: src/window.rs:871
+#: src/window.rs:909
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr ""
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:954
+#: src/window.rs:992
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr ""
 
-#: src/window.rs:966
+#: src/window.rs:1004
 #, no-c-format
 msgid "Download Complete"
 msgstr ""
 
-#: src/window.rs:1062
+#: src/window.rs:1103
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr ""

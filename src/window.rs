@@ -1177,6 +1177,7 @@ impl RillWindow {
 
     fn restore_torrents(&self, saved: Vec<SavedTorrent>) {
         let tx = self.sender();
+        let mut to_check = Vec::new();
         for torrent in saved {
             let state = self.imp().torrents.borrow_mut().restore(
                 &torrent.info_hash,
@@ -1208,11 +1209,68 @@ impl RillWindow {
             let row = self.make_row(&torrent.info_hash);
             row.update(&update);
             self.list_for(state).append(&row);
+            // A failed torrent says so already, and one with nothing downloaded has
+            // nothing to lose.
+            if state != TorrentUiState::Error && torrent.downloaded > 0 {
+                to_check.push((
+                    torrent.info_hash.clone(),
+                    torrent.uri.clone(),
+                    torrent.output_dir_path(),
+                ));
+            }
         }
         self.update_sections();
-        // Torrents still stored as downloading, because Rill did not shut down cleanly,
-        // are started as far as the queue allows.
-        self.check_queue();
+        self.find_missing_files(to_check);
+    }
+
+    /// Looks for the files of `torrents` (info hash, source, folder) off the main thread,
+    /// and shows the ones whose files were removed while Rill was not running as paused
+    /// with what is left. Then starts the torrents stored as downloading, as far as the
+    /// queue allows, which waits for this: mtorrent must not read a progress file that is
+    /// about to be corrected.
+    fn find_missing_files(&self, torrents: Vec<(String, String, PathBuf)>) {
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                let missing = gio::spawn_blocking(move || {
+                    torrents
+                        .into_iter()
+                        .filter_map(|(hash, uri, dir)| {
+                            torrent_paths::find_missing_content(&uri, &dir)
+                                .map(|missing| (hash, missing))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .await
+                .unwrap_or_default();
+                for (hash, missing) in missing {
+                    window.show_files_missing(&hash, missing);
+                }
+                window.check_queue();
+            }
+        ));
+    }
+
+    fn show_files_missing(&self, hash: &str, missing: torrent_paths::MissingContent) {
+        let Some(row) = self.imp().rows.borrow().get(hash).cloned() else {
+            return;
+        };
+        // Resumed in the meantime: its own snapshots will tell.
+        if self.engine().is_active(hash) {
+            return;
+        }
+        log::warn!(
+            "Files of {hash} are missing; {} bytes left",
+            missing.present_bytes
+        );
+        if let Some(mut update) = row.latest() {
+            update.state = TorrentUiState::Paused;
+            update.downloaded = missing.present_bytes.min(update.total);
+            update.downloaded_pieces = missing.present_pieces as usize;
+            self.process_update(&update);
+        }
+        row.show_files_missing();
     }
 
     fn persist(&self, update: &UiUpdate) {

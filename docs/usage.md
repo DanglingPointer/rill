@@ -31,7 +31,13 @@ folder has to be on the same disk; Rill says so and changes nothing when the mov
 Within each group the main menu orders torrents by the date they were added, their name,
 their size or how far along they are; torrents that compare equal keep the order they
 were added in. Pause All and Resume All, also in the main menu, act on every torrent in
-the list.
+the list; Resume All starts no more than the download limit allows, and the rest follow
+as downloads finish.
+
+When Rill starts, it looks for the files of every torrent that has downloaded something.
+A torrent whose files were removed or cut short while Rill was not running moves to
+Paused and says which: none of its files were found, or some were and how much is left.
+Resuming it downloads what is missing again.
 
 Ctrl+F searches the names. Selection mode, from the main menu or Select in a context
 menu, acts on several torrents at once: the bar at the bottom resumes, pauses or deletes

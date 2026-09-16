@@ -44,6 +44,8 @@ mod imp {
 
         pub info_hash: RefCell<String>,
         pub state: Cell<TorrentUiState>,
+        /// Its files were found gone; said instead of its progress until it runs again.
+        pub files_missing: Cell<bool>,
         pub latest: RefCell<Option<UiUpdate>>,
         pub menu: RefCell<Option<gtk::PopoverMenu>>,
     }
@@ -175,13 +177,28 @@ impl TorrentRow {
             update.name.clone()
         };
         imp.name_label.set_text(&name);
-        imp.status_label.set_text(&status_text(update));
+        if update.state != TorrentUiState::Paused {
+            imp.files_missing.set(false);
+        }
+        imp.status_label.set_text(&if imp.files_missing.get() {
+            missing_text(update)
+        } else {
+            status_text(update)
+        });
         imp.progress_bar.set_fraction(if update.total > 0 {
             update.downloaded as f64 / update.total as f64
         } else {
             0.0
         });
         self.set_state(update.state);
+    }
+
+    /// Says the torrent's files are gone, some or all, until it runs again.
+    pub fn show_files_missing(&self) {
+        self.imp().files_missing.set(true);
+        if let Some(update) = self.latest() {
+            self.update(&update);
+        }
     }
 
     /// Shows `state` ahead of the engine confirming it.
@@ -310,6 +327,15 @@ fn magnet_link(update: &UiUpdate) -> String {
         link
     } else {
         format!("{link}&dn={}", urlencoding::encode(&update.name))
+    }
+}
+
+fn missing_text(update: &UiUpdate) -> String {
+    if update.downloaded == 0 {
+        gettext("Files not found")
+    } else {
+        // Translators: some of a torrent's files are gone; %s is how much is left, "1.2 GiB".
+        gettext("Some files not found, %s left").replace("%s", &format_size(update.downloaded))
     }
 }
 

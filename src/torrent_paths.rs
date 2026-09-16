@@ -1,4 +1,5 @@
-//! Where a torrent's content is on disk, and removing it.
+//! Where a torrent's content is on disk, moving and removing it, and noticing when it is
+//! gone.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -106,6 +107,107 @@ pub fn move_content(uri: &str, old_dir: &Path, new_dir: &Path) -> std::io::Resul
         moved.push((from, to));
     }
     Ok(true)
+}
+
+/// What is left of a torrent whose files were removed, some or all, behind Rill's back.
+#[derive(Debug, PartialEq)]
+pub struct MissingContent {
+    /// The bytes of the files still there.
+    pub present_bytes: u64,
+    /// The pieces still counted as downloaded.
+    pub present_pieces: u64,
+}
+
+/// Name of the file mtorrent keeps a torrent's downloaded pieces in, in its content folder.
+const PROGRESS_FILE: &str = ".mtorrent";
+
+/// Looks for a torrent's files, and returns what is left when some are gone or cut short.
+/// mtorrent takes the pieces its progress file lists as downloaded without reading them
+/// again, so the pieces of the missing files are struck from that file, for a resumed
+/// torrent to download them again rather than finish at once with nothing on disk.
+///
+/// `None` when every file is there, or when there is no telling: without the metadata only
+/// a missing content folder says the files are gone.
+pub fn find_missing_content(uri: &str, output_dir: &Path) -> Option<MissingContent> {
+    use mtorrent::utils::re_exports::mtorrent_core::input::Metainfo;
+
+    let content = content_path(uri, output_dir)?;
+    let metainfo = metainfo_path(uri, output_dir).and_then(|path| Metainfo::from_file(path).ok());
+    let Some(metainfo) = metainfo else {
+        return (!content.exists()).then_some(MissingContent {
+            present_bytes: 0,
+            present_pieces: 0,
+        });
+    };
+    // Laid out as mtorrent lays them out: a single file inside the content folder too.
+    let files: Vec<(usize, PathBuf)> = match metainfo.files() {
+        Some(files) => files.collect(),
+        None => vec![(metainfo.length()?, PathBuf::from(metainfo.name()?))],
+    };
+
+    let mut offset = 0;
+    let mut present_bytes = 0;
+    let mut missing = Vec::new();
+    for (length, path) in files {
+        let there = length == 0
+            || std::fs::metadata(content.join(&path))
+                .is_ok_and(|meta| meta.is_file() && meta.len() >= length as u64);
+        if there {
+            present_bytes += length as u64;
+        } else {
+            missing.push(offset..offset + length);
+        }
+        offset += length;
+    }
+    if missing.is_empty() {
+        return None;
+    }
+    let present_pieces = forget_pieces(
+        &content.join(PROGRESS_FILE),
+        metainfo.info_hash(),
+        metainfo.piece_length()?,
+        &missing,
+    );
+    Some(MissingContent {
+        present_bytes,
+        present_pieces,
+    })
+}
+
+/// Clears from the progress file the pieces that hold any of the `missing` byte ranges, and
+/// returns how many pieces it still lists. Nothing is listed without a progress file.
+fn forget_pieces(
+    progress_file: &Path,
+    info_hash: &[u8; 20],
+    piece_length: usize,
+    missing: &[std::ops::Range<usize>],
+) -> u64 {
+    use mtorrent::utils::re_exports::mtorrent_utils::benc::Element;
+
+    let Ok(bytes) = std::fs::read(progress_file) else {
+        return 0;
+    };
+    let Ok(Element::Dictionary(mut root)) = Element::from_bytes(&bytes) else {
+        return 0;
+    };
+    let key = Element::ByteString(info_hash.to_vec());
+    let Some(Element::ByteString(mut bitfield)) = root.remove(&key) else {
+        return 0;
+    };
+    // Piece 0 is the highest bit of the first byte.
+    for range in missing.iter().filter(|range| !range.is_empty()) {
+        for piece in range.start / piece_length..=(range.end - 1) / piece_length {
+            if let Some(byte) = bitfield.get_mut(piece / 8) {
+                *byte &= !(0x80 >> (piece % 8));
+            }
+        }
+    }
+    let present = bitfield.iter().map(|byte| byte.count_ones() as u64).sum();
+    root.insert(key, Element::ByteString(bitfield));
+    if let Err(e) = std::fs::write(progress_file, Element::Dictionary(root).encode()) {
+        log::warn!("Failed to update {}: {e}", progress_file.display());
+    }
+    present
 }
 
 /// Removes a torrent's content without following a symbolic link at `path`.
@@ -242,6 +344,151 @@ mod tests {
         assert!(source.join("film.torrent").exists());
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A .torrent file in `dir` for the files named and sized in `files`, in pieces of four
+    /// bytes, with a progress file in its content folder counting every piece downloaded.
+    fn torrent_with_progress(dir: &Path, files: &[(&str, usize)]) -> String {
+        use mtorrent::utils::re_exports::mtorrent_core::input::Metainfo;
+        use mtorrent::utils::re_exports::mtorrent_utils::benc::Element;
+
+        let length: usize = files.iter().map(|(_, length)| length).sum();
+        let pieces = length.div_ceil(4);
+        let files = files
+            .iter()
+            .map(|(name, length)| {
+                Element::Dictionary(
+                    [
+                        (Element::from("length"), Element::Integer(*length as i64)),
+                        (
+                            Element::from("path"),
+                            Element::List(vec![Element::from(*name)]),
+                        ),
+                    ]
+                    .into(),
+                )
+            })
+            .collect();
+        let info = Element::Dictionary(
+            [
+                (Element::from("files"), Element::List(files)),
+                (Element::from("name"), Element::from("show")),
+                (Element::from("piece length"), Element::Integer(4)),
+                (
+                    Element::from("pieces"),
+                    Element::ByteString(vec![0; pieces * 20]),
+                ),
+            ]
+            .into(),
+        );
+        let metainfo = Element::Dictionary([(Element::from("info"), info)].into());
+        let uri = dir.join("show.torrent");
+        std::fs::write(&uri, metainfo.encode()).unwrap();
+
+        let info_hash = *Metainfo::from_file(&uri).unwrap().info_hash();
+        let mut bitfield = vec![0u8; pieces.div_ceil(8)];
+        for piece in 0..pieces {
+            bitfield[piece / 8] |= 0x80 >> (piece % 8);
+        }
+        let progress = Element::Dictionary(
+            [(
+                Element::ByteString(info_hash.to_vec()),
+                Element::ByteString(bitfield),
+            )]
+            .into(),
+        );
+        std::fs::create_dir_all(dir.join("show")).unwrap();
+        std::fs::write(dir.join("show").join(PROGRESS_FILE), progress.encode()).unwrap();
+        uri.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn removed_files_are_found_and_their_pieces_forgotten() {
+        let dir = crate::test_support::ScratchDir::new("missing-content");
+        let output_dir = dir.path();
+        // Pieces 0 and 1 are the first file's, piece 2 straddles both, 3 and 4 the second's.
+        let uri = torrent_with_progress(output_dir, &[("one", 10), ("two", 10)]);
+        std::fs::write(output_dir.join("show/one"), [0; 10]).unwrap();
+        std::fs::write(output_dir.join("show/two"), [0; 10]).unwrap();
+        assert_eq!(find_missing_content(&uri, output_dir), None);
+
+        std::fs::remove_file(output_dir.join("show/two")).unwrap();
+        let missing = MissingContent {
+            present_bytes: 10,
+            present_pieces: 2,
+        };
+        assert_eq!(find_missing_content(&uri, output_dir), Some(missing));
+        // Struck from the progress file for good: nothing more to forget the second time.
+        assert_eq!(
+            find_missing_content(&uri, output_dir).map(|m| m.present_pieces),
+            Some(2)
+        );
+
+        // A file cut short is as good as gone.
+        std::fs::write(output_dir.join("show/one"), [0; 3]).unwrap();
+        assert_eq!(
+            find_missing_content(&uri, output_dir),
+            Some(MissingContent {
+                present_bytes: 0,
+                present_pieces: 0
+            })
+        );
+    }
+
+    #[test]
+    fn a_torrent_whose_files_were_removed_downloads_them_again_rather_than_finish() {
+        use crate::test_support::{Harness, TestTorrent};
+        use mtorrent::utils::re_exports::mtorrent_utils::benc::Element;
+
+        let h = Harness::new("missing-resume", 0);
+        let output_dir = h.output_dir();
+        let torrent = TestTorrent::create(h.dir.path(), "gone", 64 * 1024, 16 * 1024);
+        // Downloaded once, all four pieces, and the file removed since.
+        std::fs::create_dir_all(output_dir.join("gone")).unwrap();
+        let progress = Element::Dictionary(
+            [(
+                Element::ByteString(torrent.info_hash.to_vec()),
+                Element::ByteString(vec![0xf0]),
+            )]
+            .into(),
+        );
+        std::fs::write(
+            output_dir.join("gone").join(PROGRESS_FILE),
+            progress.encode(),
+        )
+        .unwrap();
+
+        let uri = torrent.metainfo_path.to_string_lossy().into_owned();
+        assert_eq!(
+            find_missing_content(&uri, &output_dir),
+            Some(MissingContent {
+                present_bytes: 0,
+                present_pieces: 0
+            })
+        );
+        // Left as it was, the progress file would have the torrent report every byte.
+        let hash = h
+            .engine
+            .start(String::new(), uri, output_dir, false, h.tx.clone());
+        let update = h.wait_for_update(&hash, std::time::Duration::from_secs(20), |u| u.total > 0);
+        assert_eq!(update.downloaded, 0);
+    }
+
+    #[test]
+    fn without_metadata_only_a_missing_content_folder_counts() {
+        let dir = crate::test_support::ScratchDir::new("missing-magnet");
+        let uri = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Show";
+        std::fs::create_dir_all(dir.path().join("Show")).unwrap();
+        assert_eq!(find_missing_content(uri, dir.path()), None);
+
+        std::fs::remove_dir(dir.path().join("Show")).unwrap();
+        assert_eq!(
+            find_missing_content(uri, dir.path()),
+            Some(MissingContent {
+                present_bytes: 0,
+                present_pieces: 0
+            })
+        );
     }
 
     #[test]
