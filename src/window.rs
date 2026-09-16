@@ -1000,7 +1000,13 @@ impl RillWindow {
             async move {
                 while let Ok(event) = rx.recv().await {
                     match event {
-                        UiEvent::Update(update) => window.process_update(&update),
+                        UiEvent::Update(update) => {
+                            window.process_update(&update);
+                            let row = window.imp().rows.borrow().get(&update.info_hash).cloned();
+                            if let Some(row) = row {
+                                row.note_snapshot(&update);
+                            }
+                        }
                         UiEvent::Finished { info_hash, error } => {
                             window.torrent_finished(&info_hash, error)
                         }
@@ -1267,7 +1273,10 @@ impl RillWindow {
         self.update_sections();
         // Torrents still stored as downloading are started once their files have been
         // looked for, so that one whose files are gone waits for the user instead.
-        self.check_files(true);
+        self.check_files(true, true);
+        // Running torrents are looked at all along, since mtorrent would write on into
+        // removed files; the others only while someone looks at the window, and as soon as
+        // someone does, which is also when files were likely removed in another window.
         glib::timeout_add_local(
             FILE_CHECK_INTERVAL,
             glib::clone!(
@@ -1276,31 +1285,40 @@ impl RillWindow {
                 #[upgrade_or]
                 glib::ControlFlow::Break,
                 move || {
-                    window.check_files(false);
+                    window.check_files(window.is_active(), false);
                     glib::ControlFlow::Continue
                 }
             ),
         );
+        self.connect_is_active_notify(|window| {
+            if window.is_active() {
+                window.check_files(true, false);
+            }
+        });
     }
 
-    /// Looks for the files of every torrent with something downloaded, off the main thread,
-    /// and shows the ones whose files were removed or cut short as paused, with what is
-    /// left. With `then_queue`, the download queue runs once that is done.
-    fn check_files(&self, then_queue: bool) {
+    /// Looks for the files of the running torrents, and with `idle_too` of the others as well,
+    /// off the main thread, and shows the ones whose files were removed or cut short as
+    /// paused, with what is left. With `then_queue`, the download queue runs once that is done.
+    fn check_files(&self, idle_too: bool, then_queue: bool) {
         let imp = self.imp();
         if imp.checking_files.replace(true) {
             return;
         }
         // A failed torrent says so already, one with nothing downloaded has nothing to lose,
-        // and one already found missing stays so until it runs again.
+        // one already found missing stays so until it runs again, and one whose run has yet
+        // to make its files is not missing them.
         let torrents: Vec<(String, TorrentUiState, UiUpdate)> = imp
             .rows
             .borrow()
             .iter()
             .filter(|(_, row)| {
-                row.state() != TorrentUiState::Error
+                let state = row.state();
+                state != TorrentUiState::Error
+                    && (idle_too || state == TorrentUiState::Downloading)
                     && !row.files_missing()
-                    && (row.state() == TorrentUiState::Completed || row.progress().0 > 0)
+                    && row.files_expected()
+                    && (state == TorrentUiState::Completed || row.progress().0 > 0)
             })
             .filter_map(|(hash, row)| Some((hash.clone(), row.state(), row.latest()?)))
             .collect();

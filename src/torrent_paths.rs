@@ -166,6 +166,11 @@ pub fn find_missing_content(
     layout: Option<&ContentLayout>,
     forget: bool,
 ) -> Option<MissingContent> {
+    // An unmounted disk takes the download folder with it, and every torrent in it would
+    // look removed; its files may well be back once it is mounted.
+    if !output_dir.is_dir() {
+        return None;
+    }
     let Some(layout) = layout else {
         let content = content_path(uri, output_dir)?;
         return (!content.exists()).then_some(MissingContent {
@@ -206,7 +211,8 @@ pub fn find_missing_content(
 
 /// Clears the pieces that hold any of the `missing` byte ranges from the progress file, or
 /// with `write` false only works out the result, and returns how many pieces it still lists.
-/// Nothing is listed without a progress file.
+/// Nothing is listed without a progress file, and the file is left alone when no piece it
+/// lists is cleared.
 fn forget_pieces(
     progress_file: &Path,
     info_hash: &[u8; 20],
@@ -226,6 +232,8 @@ fn forget_pieces(
     let Some(Element::ByteString(mut bitfield)) = root.remove(&key) else {
         return 0;
     };
+    let count = |bitfield: &[u8]| bitfield.iter().map(|byte| byte.count_ones() as u64).sum();
+    let listed: u64 = count(&bitfield);
     // Piece 0 is the highest bit of the first byte.
     for range in missing.iter().filter(|range| !range.is_empty()) {
         for piece in range.start / piece_length..=(range.end - 1) / piece_length {
@@ -234,8 +242,13 @@ fn forget_pieces(
             }
         }
     }
-    let present = bitfield.iter().map(|byte| byte.count_ones() as u64).sum();
-    if write {
+    let present = count(&bitfield);
+    if write && present != listed {
+        log::info!(
+            "Forgetting {} downloaded pieces of removed files in {}",
+            listed - present,
+            progress_file.display()
+        );
         root.insert(key, Element::ByteString(bitfield));
         if let Err(e) = std::fs::write(progress_file, Element::Dictionary(root).encode()) {
             log::warn!("Failed to update {}: {e}", progress_file.display());
@@ -521,6 +534,9 @@ mod tests {
                 present_pieces: 0
             })
         );
+        // Nor does anything count when the download folder itself is gone.
+        let unmounted = dir.path().join("unmounted");
+        assert_eq!(find_missing_content(uri, &unmounted, None, false), None);
     }
 
     #[test]

@@ -630,20 +630,13 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
     // the pieces its progress file lists without reading them again. No run of this
     // torrent is left to write that file.
     let (check_uri, check_dir) = (uri.clone(), output_dir.clone());
-    let missing = tokio::task::spawn_blocking(move || {
+    let _ = tokio::task::spawn_blocking(move || {
         let layout = crate::torrent_paths::content_layout(&check_uri, &check_dir);
-        layout.as_ref().and_then(|layout| {
-            crate::torrent_paths::find_missing_content(&check_uri, &check_dir, Some(layout), true)
-        })
+        if let Some(layout) = layout {
+            crate::torrent_paths::find_missing_content(&check_uri, &check_dir, Some(&layout), true);
+        }
     })
     .await;
-    if let Ok(Some(missing)) = missing {
-        log::info!(
-            "Torrent {} is missing files; {} bytes left to keep",
-            info_hash,
-            missing.present_bytes
-        );
-    }
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));
     let total_bytes = Arc::new(Mutex::new(0u64));

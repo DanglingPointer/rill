@@ -46,6 +46,9 @@ mod imp {
         pub state: Cell<TorrentUiState>,
         /// Its files were found gone; said instead of its progress until it runs again.
         pub files_missing: Cell<bool>,
+        /// The current run has its files on disk: until then a run started after they were
+        /// removed has not made them again, and they are not worth looking for.
+        pub files_made: Cell<bool>,
         pub latest: RefCell<Option<UiUpdate>>,
         pub menu: RefCell<Option<gtk::PopoverMenu>>,
     }
@@ -180,6 +183,9 @@ impl TorrentRow {
         if update.state != TorrentUiState::Paused {
             imp.files_missing.set(false);
         }
+        if update.state != TorrentUiState::Downloading {
+            imp.files_made.set(false);
+        }
         imp.status_label.set_text(&if imp.files_missing.get() {
             missing_text(update)
         } else {
@@ -191,6 +197,20 @@ impl TorrentRow {
             0.0
         });
         self.set_state(update.state);
+    }
+
+    /// Whether the files of the torrent are worth looking for: it is not running, or its run
+    /// has made them.
+    pub fn files_expected(&self) -> bool {
+        self.state() != TorrentUiState::Downloading || self.imp().files_made.get()
+    }
+
+    /// Notes that a snapshot from the engine counts pieces, which it does once the run has
+    /// made the torrent's files.
+    pub fn note_snapshot(&self, update: &UiUpdate) {
+        if update.state == TorrentUiState::Downloading && update.total_pieces > 0 {
+            self.imp().files_made.set(true);
+        }
     }
 
     /// Whether the torrent's files were found gone since it last ran.

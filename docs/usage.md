@@ -35,10 +35,13 @@ the list; Resume All starts no more than the download limit allows, and the rest
 as downloads finish.
 
 Rill looks for the files of every torrent that has downloaded something when it starts,
-and every ten seconds after. A torrent whose files were removed or cut short is paused,
-moves to Paused and says which: none of its files were found, or some were and how much
-is left. Resuming it downloads what is missing again, and so does resuming a torrent
-whose files went missing too recently to have been noticed.
+when its window comes to the front, and every ten seconds while the window is in front;
+the files of running torrents it looks for every ten seconds all the time. A torrent
+whose files were removed or cut short is paused, moves to Paused and says which: none of
+its files were found, or some were and how much is left. Resuming it downloads what is
+missing again, and so does resuming a torrent whose files went missing too recently to
+have been noticed. A download folder that is not there at all, as on a disk that is not
+mounted, is left alone: its torrents keep their state until the folder is back.
 
 Ctrl+F searches the names. Selection mode, from the main menu or Select in a context
 menu, acts on several torrents at once: the bar at the bottom resumes, pauses or deletes
