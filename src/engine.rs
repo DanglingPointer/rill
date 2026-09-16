@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use async_channel::Sender;
@@ -94,24 +94,48 @@ pub enum UiEvent {
 
 /// Why a running torrent task is being ended.
 #[derive(Clone, Copy, Debug)]
-enum Stop {
+pub(crate) enum Stop {
     /// The torrent is being paused, and the task reports the paused state as it ends.
     Pause,
     /// The task is being replaced right away by one with different settings, so the
-    /// torrent keeps running and the ending task reports nothing.
+    /// torrent keeps running and the ending task, listener included, reports nothing.
     Restart,
+}
+
+impl Stop {
+    /// What the flag holds while the torrent runs.
+    pub(crate) const RUNNING: u8 = 0;
+
+    pub(crate) fn code(self) -> u8 {
+        match self {
+            Stop::Pause => 1,
+            Stop::Restart => 2,
+        }
+    }
+
+    /// The reason the flag holds, or `None` while the torrent runs.
+    pub(crate) fn from_code(code: u8) -> Option<Self> {
+        match code {
+            1 => Some(Stop::Pause),
+            2 => Some(Stop::Restart),
+            _ => None,
+        }
+    }
 }
 
 /// A torrent the engine knows, running or not.
 #[derive(Debug)]
 struct TorrentEntry {
-    /// Held, not read: the task watches the count of this Arc, and dropping the sender
-    /// wakes its cancellation branch. Both are None while the torrent is not running.
+    /// Held, not read: the task watches the count of this Arc to tell a download that
+    /// ended on its own from one that was stopped here.
     _canceller: Option<Arc<()>>,
-    _cancel_tx: Option<tokio::sync::oneshot::Sender<Stop>>,
-    /// Set true when this torrent is paused/stopped, so the listener can detect
-    /// cancellation atomically rather than racing on `Arc::strong_count`.
-    cancel_flag: Arc<AtomicBool>,
+    /// Ends the running task, telling it whether the torrent is stopping or starting
+    /// anew. Both are None while the torrent is not running.
+    cancel_tx: Option<tokio::sync::oneshot::Sender<Stop>>,
+    /// Set to the reason this torrent is ending, so the task and its listener can
+    /// detect cancellation atomically rather than racing on `Arc::strong_count`, and
+    /// tell a pause from a restart.
+    stop_flag: Arc<AtomicU8>,
     name: String,
     uri: String,
     output_dir: PathBuf,
@@ -131,8 +155,8 @@ impl TorrentEntry {
     ) -> Self {
         Self {
             _canceller: None,
-            _cancel_tx: None,
-            cancel_flag: Arc::new(AtomicBool::new(false)),
+            cancel_tx: None,
+            stop_flag: Arc::new(AtomicU8::new(Stop::RUNNING)),
             name,
             uri,
             output_dir,
@@ -145,10 +169,10 @@ impl TorrentEntry {
     /// Ends the running task, if any, telling it why.
     fn halt(&mut self, reason: Stop) {
         // Signal the listener before tearing down, so an in-flight snapshot cannot
-        // emit a stale update afterwards.
-        self.cancel_flag.store(true, Ordering::Release);
+        // emit a stale update afterwards, and a restart emits none at all.
+        self.stop_flag.store(reason.code(), Ordering::Release);
         self._canceller = None;
-        if let Some(tx) = self._cancel_tx.take() {
+        if let Some(tx) = self.cancel_tx.take() {
             // An error means the task is already gone, which ends it just the same.
             let _ = tx.send(reason);
         }
@@ -174,7 +198,7 @@ struct StartCmd {
     output_dir: PathBuf,
     canceller: Arc<()>,
     cancel_rx: tokio::sync::oneshot::Receiver<Stop>,
-    cancel_flag: Arc<AtomicBool>,
+    stop_flag: Arc<AtomicU8>,
     ui_tx: Sender<UiEvent>,
     sequential: Arc<AtomicBool>,
     pwp_port: u16,
@@ -361,7 +385,7 @@ impl TorrentEngine {
     ) -> Result<(), Box<(TorrentEntry, String)>> {
         let canceller = Arc::new(());
         let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<Stop>();
-        let cancel_flag = Arc::new(AtomicBool::new(false));
+        let stop_flag = Arc::new(AtomicU8::new(Stop::RUNNING));
         let port = listening_port(
             self.storage.pwp_port(),
             active.values().map(|torrent| torrent.port),
@@ -373,7 +397,7 @@ impl TorrentEngine {
             output_dir: torrent.output_dir.clone(),
             canceller: Arc::clone(&canceller),
             cancel_rx,
-            cancel_flag: Arc::clone(&cancel_flag),
+            stop_flag: Arc::clone(&stop_flag),
             ui_tx: torrent.ui_tx.clone(),
             sequential: Arc::clone(&torrent.sequential),
             pwp_port: port,
@@ -382,8 +406,8 @@ impl TorrentEngine {
             return Err(Box::new((torrent, e.to_string())));
         }
         torrent._canceller = Some(canceller);
-        torrent._cancel_tx = Some(cancel_tx);
-        torrent.cancel_flag = cancel_flag;
+        torrent.cancel_tx = Some(cancel_tx);
+        torrent.stop_flag = stop_flag;
         torrent.port = port;
         active.insert(info_hash.to_string(), torrent);
         Ok(())
@@ -528,7 +552,7 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
         output_dir,
         canceller,
         cancel_rx,
-        cancel_flag,
+        stop_flag,
         ui_tx,
         sequential,
         pwp_port,
@@ -553,7 +577,7 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
 
     let listener = GtkListener::new(
         Arc::downgrade(&canceller),
-        Arc::clone(&cancel_flag),
+        Arc::clone(&stop_flag),
         ui_tx.clone(),
         info_hash.clone(),
         name.clone(),
@@ -841,7 +865,7 @@ mod tests {
         // The task that runs the torrent, told apart by the flag that cancels it.
         let run = |hash: &str| {
             let map = lock_recover(&h.engine.active, "active map");
-            Arc::as_ptr(&map[hash].cancel_flag)
+            Arc::as_ptr(&map[hash].stop_flag)
         };
         let before = run(&hash);
 
@@ -850,8 +874,19 @@ mod tests {
         // once, when the download starts.
         assert!(h.engine.is_active(&hash));
         assert_ne!(run(&hash), before);
-        let update = h.wait_for_update(&hash, WAIT, |u| u.sequential);
-        assert_eq!(update.state, TorrentUiState::Downloading);
+        // Two snapshots, so the replaced task has had a turn to report as well: none of
+        // them says the torrent paused.
+        let mut seen = 0;
+        let update = h.wait_for_update(&hash, WAIT, |u| {
+            assert_eq!(
+                u.state,
+                TorrentUiState::Downloading,
+                "the restart reported the torrent as no longer downloading"
+            );
+            seen += u.sequential as usize;
+            seen == 2
+        });
+        assert!(update.sequential);
 
         // Setting what is already set leaves the run alone.
         let after = run(&hash);

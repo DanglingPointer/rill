@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_channel::Sender;
 use mtorrent::utils::listener::{StateListener, StateSnapshot};
 
-use crate::engine::{TorrentUiState, UiEvent, UiUpdate};
+use crate::engine::{Stop, TorrentUiState, UiEvent, UiUpdate};
 
 /// Receives mtorrent's once-a-second snapshots of a torrent and forwards them to the
 /// window as [`UiUpdate`]s.
@@ -15,7 +15,7 @@ pub struct GtkListener {
     /// Set by the engine when this torrent is paused/stopped. Checked first so
     /// cancellation is observed atomically rather than racing on the canceller's
     /// strong count.
-    cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+    stop_flag: Arc<std::sync::atomic::AtomicU8>,
     tx: Sender<UiEvent>,
     info_hash: String,
     name: String,
@@ -42,7 +42,7 @@ impl GtkListener {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         canceller: Weak<()>,
-        cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+        stop_flag: Arc<std::sync::atomic::AtomicU8>,
         tx: Sender<UiEvent>,
         info_hash: String,
         name: String,
@@ -54,7 +54,7 @@ impl GtkListener {
     ) -> Self {
         Self {
             canceller,
-            cancel_flag,
+            stop_flag,
             tx,
             info_hash,
             name,
@@ -182,10 +182,15 @@ impl StateListener for GtkListener {
             self.name_resolved = true;
         }
 
-        if self.cancel_flag.load(std::sync::atomic::Ordering::Acquire)
-            || self.canceller.strong_count() < 2
-        {
-            log::debug!("Listener cancelled for: {}", self.info_hash);
+        // A torrent whose entry went away without a reason ends as a pause does.
+        let stop = Stop::from_code(self.stop_flag.load(std::sync::atomic::Ordering::Acquire))
+            .or_else(|| (self.canceller.strong_count() < 2).then_some(Stop::Pause));
+        if let Some(stop) = stop {
+            log::debug!("Listener cancelled for: {} ({:?})", self.info_hash, stop);
+            if matches!(stop, Stop::Restart) {
+                // The torrent goes on in a new task, which reports its state.
+                return ControlFlow::Break(());
+            }
             let _ = self.tx.try_send(UiEvent::Update(UiUpdate {
                 downloaded: self.last_downloaded,
                 total: snapshot.bytes.total as u64,
@@ -311,5 +316,51 @@ mod tests {
         let name = metainfo_name(uri, &dir);
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(name.as_deref(), Some("real name"));
+    }
+
+    /// A listener as a torrent task has it, with the stop flag the engine would set.
+    fn listener(stop: Option<Stop>, tx: Sender<UiEvent>) -> (GtkListener, Arc<()>) {
+        use std::sync::atomic::{AtomicBool, AtomicU8};
+
+        let canceller = Arc::new(());
+        let listener = GtkListener::new(
+            Arc::downgrade(&canceller),
+            Arc::new(AtomicU8::new(stop.map_or(Stop::RUNNING, Stop::code))),
+            tx,
+            "hash".into(),
+            "Name".into(),
+            "magnet:?xt=urn:btih:0123456789012345678901234567890123456789".into(),
+            PathBuf::from("/tmp"),
+            Arc::new(Mutex::new(0)),
+            Arc::new(Mutex::new(0)),
+            Arc::new(AtomicBool::new(false)),
+        );
+        (listener, canceller)
+    }
+
+    fn empty_snapshot() -> StateSnapshot<'static> {
+        StateSnapshot {
+            peers: Default::default(),
+            pieces: Default::default(),
+            bytes: Default::default(),
+            requests: Default::default(),
+            metainfo: Default::default(),
+        }
+    }
+
+    #[test]
+    fn a_paused_torrent_is_reported_but_a_restarted_one_is_left_to_its_new_task() {
+        let (tx, events) = async_channel::unbounded();
+
+        let (mut paused, _canceller) = listener(Some(Stop::Pause), tx.clone());
+        assert!(paused.on_snapshot(empty_snapshot()).is_break());
+        let UiEvent::Update(update) = events.try_recv().expect("the pause is reported") else {
+            panic!("expected an update");
+        };
+        assert_eq!(update.state, TorrentUiState::Paused);
+
+        let (mut restarted, _canceller) = listener(Some(Stop::Restart), tx);
+        assert!(restarted.on_snapshot(empty_snapshot()).is_break());
+        assert!(events.try_recv().is_err(), "the restart reported something");
     }
 }

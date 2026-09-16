@@ -41,7 +41,8 @@ by the queue.
 
 Activating a row opens the torrent's details. Overview has the progress, a map of which
 pieces are on disk, speeds, peers, the time left, the sequential switch, the download
-folder and the source, which a click copies. Files lists what the torrent contains, once
+folder and the source, which a click copies. Moving the sequential switch on a running
+torrent restarts it, so it reconnects to its peers. Files lists what the torrent contains, once
 its metadata is known; for a magnet link that is after it has been fetched from peers.
 Peers lists the connections with their client, speed and whether they are encrypted, and
 Trackers the trackers the torrent names.
