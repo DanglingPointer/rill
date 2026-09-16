@@ -1719,9 +1719,9 @@ dependencies = [
 
 [[package]]
 name = "mtorrent"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0d8ff4e3520a7dfe57476a05185b4ccb043ac500d3e7fa0506801b51fc9b718"
+checksum = "bbdf4ffeaae8d9df24b045f61e6720e406ca25b153aabfb96e84e02167cbf941"
 dependencies = [
  "bytes",
  "derive_more",
@@ -1735,12 +1735,13 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tokio-util",
 ]
 
 [[package]]
 name = "mtorrent-core"
-version = "0.5.5"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06a40c20732287fcb3ecad4f81054cd8f578574bc8b50c20ddb56d3cfcddadc6"
 dependencies = [
  "bitvec",
  "bytes",
@@ -1752,6 +1753,7 @@ dependencies = [
  "local_async_utils",
  "log",
  "mtorrent-utils",
+ "normalize-path",
  "pin-project-lite",
  "rand",
  "rc4",
@@ -1760,15 +1762,14 @@ dependencies = [
  "sha1_smol",
  "thiserror 2.0.18",
  "tokio",
- "tokio-util",
  "url",
 ]
 
 [[package]]
 name = "mtorrent-dht"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2885d60dfd6256d5da01cab70f8a8cbf755768a87dae4de112352747c01ee21"
+checksum = "1b0de52159c9bb4b764690f3a3fa56730576698bf0cab147adae3ad405521eb3"
 dependencies = [
  "bitvec",
  "derive_more",
@@ -1788,9 +1789,9 @@ dependencies = [
 
 [[package]]
 name = "mtorrent-utils"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dee9cfa246d2b48b83ee8f25f3d010d22da41b7debc5176279c3dbb615d2124"
+checksum = "1830517af2a840c6688936ae5c7e12a7e292de116ead921d9a5a3edda5c53727"
 dependencies = [
  "bytes",
  "derive_more",
@@ -1805,6 +1806,12 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
 ]
+
+[[package]]
+name = "normalize-path"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5438dd2b2ff4c6df6e1ce22d825ed2fa93ee2922235cc45186991717f0a892d"
 
 [[package]]
 name = "ntapi"

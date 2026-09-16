@@ -92,13 +92,23 @@ pub enum UiEvent {
     },
 }
 
+/// Why a running torrent task is being ended.
+#[derive(Clone, Copy, Debug)]
+enum Stop {
+    /// The torrent is being paused, and the task reports the paused state as it ends.
+    Pause,
+    /// The task is being replaced right away by one with different settings, so the
+    /// torrent keeps running and the ending task reports nothing.
+    Restart,
+}
+
 /// A torrent the engine knows, running or not.
 #[derive(Debug)]
 struct TorrentEntry {
     /// Held, not read: the task watches the count of this Arc, and dropping the sender
     /// wakes its cancellation branch. Both are None while the torrent is not running.
     _canceller: Option<Arc<()>>,
-    _cancel_tx: Option<tokio::sync::oneshot::Sender<()>>,
+    _cancel_tx: Option<tokio::sync::oneshot::Sender<Stop>>,
     /// Set true when this torrent is paused/stopped, so the listener can detect
     /// cancellation atomically rather than racing on `Arc::strong_count`.
     cancel_flag: Arc<AtomicBool>,
@@ -132,13 +142,16 @@ impl TorrentEntry {
         }
     }
 
-    /// Ends the running task, if any.
-    fn halt(&mut self) {
+    /// Ends the running task, if any, telling it why.
+    fn halt(&mut self, reason: Stop) {
         // Signal the listener before tearing down, so an in-flight snapshot cannot
         // emit a stale update afterwards.
         self.cancel_flag.store(true, Ordering::Release);
         self._canceller = None;
-        self._cancel_tx = None;
+        if let Some(tx) = self._cancel_tx.take() {
+            // An error means the task is already gone, which ends it just the same.
+            let _ = tx.send(reason);
+        }
     }
 
     fn idle_update(&self, info_hash: &str, state: TorrentUiState) -> UiUpdate {
@@ -160,7 +173,7 @@ struct StartCmd {
     uri: String,
     output_dir: PathBuf,
     canceller: Arc<()>,
-    cancel_rx: tokio::sync::oneshot::Receiver<()>,
+    cancel_rx: tokio::sync::oneshot::Receiver<Stop>,
     cancel_flag: Arc<AtomicBool>,
     ui_tx: Sender<UiEvent>,
     sequential: Arc<AtomicBool>,
@@ -347,7 +360,7 @@ impl TorrentEngine {
         active: &mut HashMap<String, TorrentEntry>,
     ) -> Result<(), Box<(TorrentEntry, String)>> {
         let canceller = Arc::new(());
-        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<Stop>();
         let cancel_flag = Arc::new(AtomicBool::new(false));
         let port = listening_port(
             self.storage.pwp_port(),
@@ -382,7 +395,7 @@ impl TorrentEngine {
     pub fn mark_failed(&self, info_hash: &str) {
         let mut active_map = lock_recover(&self.active, "active map");
         if let Some(mut torrent) = active_map.remove(info_hash) {
-            torrent.halt();
+            torrent.halt(Stop::Pause);
             drop(active_map);
             lock_recover(&self.saved, "saved map").insert(info_hash.to_string(), torrent);
         }
@@ -393,7 +406,7 @@ impl TorrentEngine {
         log::info!("Stopping torrent: {}", info_hash);
         let mut active = lock_recover(&self.active, "active map");
         if let Some(mut torrent) = active.remove(info_hash) {
-            torrent.halt();
+            torrent.halt(Stop::Pause);
         }
         drop(active);
         lock_recover(&self.saved, "saved map").remove(info_hash);
@@ -409,12 +422,30 @@ impl TorrentEngine {
         }
     }
 
-    /// Sets the sequential download flag for a torrent.
+    /// Sets the sequential download flag for a torrent. A running torrent is restarted,
+    /// since mtorrent takes the download strategy when the download starts and keeps it
+    /// for the rest of the run.
     pub fn set_sequential(&self, info_hash: &str, sequential: bool) {
         log::info!("Toggling sequential for {}: {}", info_hash, sequential);
-        let active_map = lock_recover(&self.active, "active map");
+        let mut active_map = lock_recover(&self.active, "active map");
         if let Some(torrent) = active_map.get(info_hash) {
+            if torrent.sequential.load(Ordering::Relaxed) == sequential {
+                return;
+            }
+            let mut torrent = active_map.remove(info_hash).expect("just found above");
+            torrent.halt(Stop::Restart);
             torrent.sequential.store(sequential, Ordering::Relaxed);
+            log::info!("Restarting torrent to apply sequential: {}", info_hash);
+            if let Err(err) = self.launch(info_hash, torrent, &mut active_map) {
+                let (torrent, e) = *err;
+                log::error!("Failed to queue torrent restart {}: {}", info_hash, e);
+                let _ = torrent.ui_tx.try_send(UiEvent::Finished {
+                    info_hash: info_hash.to_string(),
+                    error: Some("Engine unavailable".into()),
+                });
+                drop(active_map);
+                lock_recover(&self.saved, "saved map").insert(info_hash.to_string(), torrent);
+            }
             return;
         }
         drop(active_map);
@@ -430,7 +461,7 @@ impl TorrentEngine {
         let mut saved_map = lock_recover(&self.saved, "saved map");
         if let Some(mut torrent) = active_map.remove(info_hash) {
             log::info!("Pausing torrent: {}", info_hash);
-            torrent.halt();
+            torrent.halt(Stop::Pause);
             saved_map.insert(info_hash.to_string(), torrent);
         } else if let Some(torrent) = saved_map.remove(info_hash) {
             log::info!("Resuming torrent: {}", info_hash);
@@ -457,7 +488,7 @@ impl TorrentEngine {
         let mut active_map = lock_recover(&self.active, "active map");
         let mut saved_map = lock_recover(&self.saved, "saved map");
         for (info_hash, mut torrent) in active_map.drain() {
-            torrent.halt();
+            torrent.halt(Stop::Pause);
             saved_map.insert(info_hash, torrent);
         }
     }
@@ -532,6 +563,7 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
         Arc::clone(&total_bytes),
         Arc::clone(&sequential),
     );
+    let is_seq = sequential.load(Ordering::Relaxed);
     let config = app::main::Config {
         local_peer_id: shared.peer_id,
         output_dir: output_dir.clone(),
@@ -541,6 +573,12 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
         // instead of binding an ephemeral one and announcing port 0 to trackers.
         pwp_port: (pwp_port != 0).then_some(pwp_port),
         bind_interface: None,
+        // Fixed for this run: the engine restarts the torrent when the switch moves.
+        download_strategy: if is_seq {
+            app::main::DownloadStrategy::Sequential
+        } else {
+            app::main::DownloadStrategy::RarestFirst
+        },
     };
     let ctx = app::main::Context {
         dht_handle: Some(shared.dht),
@@ -549,18 +587,17 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
     };
 
     let mut rx = cancel_rx;
-    let is_seq = sequential.load(Ordering::Relaxed);
-    let result = mtorrent::utils::re_exports::mtorrent_core::SEQUENTIAL
-        .scope(sequential, async {
-            tokio::select! {
-                res = app::main::single_torrent(&uri, listener, config, ctx) => Some(res),
-                _ = &mut rx => {
-                    log::info!("Torrent task paused/cancelled: {}", info_hash);
-                    None
-                }
-            }
-        })
-        .await;
+    let mut stop_reason = Stop::Pause;
+    let result = tokio::select! {
+        res = app::main::single_torrent(&uri, listener, config, ctx) => Some(res),
+        reason = &mut rx => {
+            // A dropped sender means the entry went away without a reason, which ends
+            // the torrent as a pause does.
+            stop_reason = reason.unwrap_or(Stop::Pause);
+            log::info!("Torrent task ended ({:?}): {}", stop_reason, info_hash);
+            None
+        }
+    };
 
     if let Some(res) = result {
         if Arc::strong_count(&canceller) > 1 {
@@ -575,7 +612,7 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
                 })
                 .await;
         }
-    } else {
+    } else if matches!(stop_reason, Stop::Pause) {
         let update = UiUpdate {
             downloaded: *lock_recover(&downloaded_bytes, "downloaded bytes"),
             total: *lock_recover(&total_bytes, "total bytes"),
@@ -720,6 +757,7 @@ fn hex(hash: &[u8; 20]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::time::Duration;
 
     use super::{TorrentUiState, listening_port, lock_recover, name_nameless_magnet, torrent_id};
@@ -784,6 +822,41 @@ mod tests {
         h.engine.pause_all();
         assert!(!h.engine.is_active(&hash));
         h.engine.toggle(&hash);
+        assert!(h.engine.is_active(&hash));
+    }
+
+    #[test]
+    fn toggling_sequential_restarts_a_running_torrent_without_pausing_it() {
+        let h = Harness::new("engine-sequential", 0);
+        let hash = h.engine.start(
+            "Name".into(),
+            magnet_to_nowhere(9),
+            h.output_dir(),
+            false,
+            h.tx.clone(),
+        );
+        let first = h.wait_for_update(&hash, WAIT, |_| true);
+        assert!(!first.sequential);
+
+        // The task that runs the torrent, told apart by the flag that cancels it.
+        let run = |hash: &str| {
+            let map = lock_recover(&h.engine.active, "active map");
+            Arc::as_ptr(&map[hash].cancel_flag)
+        };
+        let before = run(&hash);
+
+        h.engine.set_sequential(&hash, true);
+        // The torrent keeps running, but in a new task: mtorrent reads the strategy
+        // once, when the download starts.
+        assert!(h.engine.is_active(&hash));
+        assert_ne!(run(&hash), before);
+        let update = h.wait_for_update(&hash, WAIT, |u| u.sequential);
+        assert_eq!(update.state, TorrentUiState::Downloading);
+
+        // Setting what is already set leaves the run alone.
+        let after = run(&hash);
+        h.engine.set_sequential(&hash, true);
+        assert_eq!(run(&hash), after);
         assert!(h.engine.is_active(&hash));
     }
 

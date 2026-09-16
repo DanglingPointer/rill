@@ -15,9 +15,9 @@ and trackers say on the network. The parts where a mistake matters most:
 - Paths. File names inside a torrent, a magnet link's display name and the name mtorrent
   derives a folder from must stay inside the download folder, for writing the content and
   for deleting it. A way to write, open or delete elsewhere is a vulnerability.
-- Parsing of metainfo, magnet links, peer messages and tracker replies, in Rill and in the
-  patched mtorrent-core under `third_party/`: a crash, a hang or unbounded memory from
-  input a peer, a tracker or a torrent file controls.
+- Parsing of metainfo, magnet links, peer messages and tracker replies, in Rill and in
+  mtorrent: a crash, a hang or unbounded memory from input a peer, a tracker or a torrent
+  file controls.
 - Trackers a torrent names must not reach link-local or unspecified addresses, so a
   torrent cannot make Rill send requests into the local network or to a cloud metadata
   service.

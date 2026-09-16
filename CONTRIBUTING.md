@@ -39,7 +39,6 @@ Before a change goes in:
     src/tray.rs              the StatusNotifier icon
     src/test_support.rs      what the tests share: scratch directories, a made-up .torrent,
                              an engine with its runtimes and database
-    third_party/mtorrent-core  the patched mtorrent-core, see its PATCHES.md
 
 Widgets are GObject subclasses with composite templates from the Blueprint files. The
 rows do not talk to the engine: their actions activate `win.pause-torrent`,
@@ -78,5 +77,5 @@ in `po/LINGUAS` plus the `.po` file.
 
 A torrent's identity is its info hash, from the magnet link or the .torrent file; records
 saved before that are re-keyed at startup. Names from a torrent never become paths
-without `torrent_paths::contained_path`, and the patched mtorrent-core refuses file paths
-that leave the download folder.
+without `torrent_paths::contained_path`, and mtorrent refuses file paths that leave the
+download folder.

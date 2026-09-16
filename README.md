@@ -30,6 +30,5 @@ for GTK and libadwaita. Details, other prefixes and removal are in
 
 Rill has no bandwidth limits yet. The interface is available in English and Ukrainian.
 
-GPL-3.0-or-later. The copy of mtorrent-core in `third_party/` is under the Apache License
-2.0; what Rill changed in it is listed in its
-[PATCHES.md](third_party/mtorrent-core/PATCHES.md).
+GPL-3.0-or-later. The engine, [mtorrent](https://github.com/DanglingPointer/mtorrent), is
+under the Apache License 2.0.
