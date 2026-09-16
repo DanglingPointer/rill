@@ -317,6 +317,16 @@ impl Database {
         Ok(())
     }
 
+    /// Update where a torrent's content is kept
+    pub fn update_torrent_output_dir(&self, info_hash: &str, output_dir: &str) -> SqlResult<()> {
+        log::info!("Updating output dir of {info_hash} in DB: {output_dir}");
+        self.conn.execute(
+            "UPDATE torrents SET output_dir = ?1 WHERE info_hash = ?2",
+            rusqlite::params![output_dir, info_hash],
+        )?;
+        Ok(())
+    }
+
     /// Update torrent sequential flag
     pub fn update_torrent_sequential(&self, info_hash: &str, sequential: bool) -> SqlResult<()> {
         log::debug!(

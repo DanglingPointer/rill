@@ -446,6 +446,17 @@ impl TorrentEngine {
         }
     }
 
+    /// Tells a torrent where its content goes from now on. The torrent must not be
+    /// running: a running one keeps the folder it started with.
+    pub fn set_output_dir(&self, info_hash: &str, output_dir: PathBuf) {
+        log::info!("Torrent {} now downloads to {:?}", info_hash, output_dir);
+        for map in [&self.active, &self.saved] {
+            if let Some(torrent) = lock_recover(map, "torrent map").get_mut(info_hash) {
+                torrent.output_dir = output_dir.clone();
+            }
+        }
+    }
+
     /// Sets the sequential download flag for a torrent. A running torrent is restarted,
     /// since mtorrent takes the download strategy when the download starts and keeps it
     /// for the rest of the run.

@@ -132,6 +132,11 @@ mod imp {
                     win.resume_torrent(hash);
                 }
             });
+            klass.install_action("win.change-folder", hash, |win, _, v| {
+                if let Some(hash) = v.and_then(|v| v.str()) {
+                    win.choose_folder_for(hash);
+                }
+            });
             klass.install_action("win.delete-torrent", hash, |win, _, v| {
                 if let Some(hash) = v.and_then(|v| v.str()) {
                     win.confirm_delete(vec![hash.to_string()]);
@@ -673,6 +678,81 @@ impl RillWindow {
         }
         self.engine().toggle(hash);
         self.check_queue();
+    }
+
+    /// Asks where a torrent's content should go from now on.
+    fn choose_folder_for(&self, hash: &str) {
+        let Some(update) = self
+            .imp()
+            .rows
+            .borrow()
+            .get(hash)
+            .and_then(TorrentRow::latest)
+        else {
+            return;
+        };
+        let chooser = gtk::FileDialog::builder()
+            .title(gettext("Choose a Download Folder"))
+            .initial_folder(&gio::File::for_path(&update.output_dir))
+            .modal(true)
+            .build();
+        let hash = hash.to_string();
+        chooser.select_folder(
+            Some(self),
+            gio::Cancellable::NONE,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |result| {
+                    if let Ok(Some(folder)) = result.map(|f| f.path()) {
+                        window.move_torrent(&hash, folder);
+                    }
+                }
+            ),
+        );
+    }
+
+    /// Moves a torrent's content to `folder` and downloads the rest of it there. The
+    /// torrent stops for the move and goes on afterwards if it was running.
+    fn move_torrent(&self, hash: &str, folder: PathBuf) {
+        let Some(row) = self.imp().rows.borrow().get(hash).cloned() else {
+            return;
+        };
+        let Some(update) = row.latest() else {
+            return;
+        };
+        if update.output_dir == folder {
+            return;
+        }
+        let running = self.engine().is_active(hash);
+        if running {
+            self.pause_torrent(hash);
+        }
+        if let Err(e) = torrent_paths::move_content(&update.uri, &update.output_dir, &folder) {
+            log::warn!("Failed to move {hash} to {}: {e}", folder.display());
+            self.show_toast(&gettext(
+                "Could not move the files; the folder is unchanged",
+            ));
+            if running {
+                self.resume_torrent(hash);
+            }
+            return;
+        }
+
+        self.engine().set_output_dir(hash, folder.clone());
+        let (key, dir) = (hash.to_string(), folder.to_string_lossy().into_owned());
+        self.storage().execute(move |s| {
+            if let Err(e) = s.update_torrent_output_dir(&key, &dir) {
+                log::warn!("{e}");
+            }
+        });
+        if let Some(mut update) = row.latest() {
+            update.output_dir = folder;
+            self.process_update(&update);
+        }
+        if running {
+            self.resume_torrent(hash);
+        }
     }
 
     /// Asks before deleting `hashes`, and whether to delete their downloaded data too.

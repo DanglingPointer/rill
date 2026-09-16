@@ -190,6 +190,17 @@ impl Storage {
             .map_err(|e| format!("Failed to rename torrent: {}", e))
     }
 
+    /// Update where a torrent's content is kept
+    pub fn update_torrent_output_dir(
+        &self,
+        info_hash: &str,
+        output_dir: &str,
+    ) -> Result<(), String> {
+        self.db()
+            .update_torrent_output_dir(info_hash, output_dir)
+            .map_err(|e| format!("Failed to save the download folder: {}", e))
+    }
+
     /// Update torrent sequential flag
     pub fn update_torrent_sequential(
         &self,

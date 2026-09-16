@@ -54,6 +54,39 @@ pub fn contained_path(output_dir: &Path, name: &str) -> Option<PathBuf> {
     }
 }
 
+/// Moves a torrent's content, and the .torrent file kept beside it, from `old_dir` to
+/// `new_dir`. Returns whether anything moved. Nothing is moved when something of that
+/// name is already in `new_dir`, and a failure leaves the content where it was.
+pub fn move_content(uri: &str, old_dir: &Path, new_dir: &Path) -> std::io::Result<bool> {
+    use std::io::{Error, ErrorKind};
+
+    let mut moved = false;
+    let pairs = [
+        (content_path(uri, old_dir), content_path(uri, new_dir)),
+        // For a torrent added as a file this is the file itself, which lives wherever
+        // the user keeps it and stays there.
+        (metainfo_path(uri, old_dir), metainfo_path(uri, new_dir)),
+    ];
+    for (from, to) in pairs {
+        let (Some(from), Some(to)) = (from, to) else {
+            continue;
+        };
+        if !from.starts_with(old_dir) || !from.exists() {
+            continue;
+        }
+        if to.exists() {
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                format!("{} is already there", to.display()),
+            ));
+        }
+        std::fs::create_dir_all(new_dir)?;
+        std::fs::rename(&from, &to)?;
+        moved = true;
+    }
+    Ok(moved)
+}
+
 /// Removes a torrent's content without following a symbolic link at `path`.
 pub fn remove_content(path: &Path) -> std::io::Result<()> {
     match std::fs::symlink_metadata(path) {
@@ -122,6 +155,48 @@ mod tests {
             metainfo_path("/tmp/source/Foo.torrent", output_dir),
             Some(PathBuf::from("/tmp/source/Foo.torrent"))
         );
+    }
+
+    #[test]
+    fn moving_a_torrent_takes_its_content_and_its_saved_metainfo_along() {
+        let root = std::env::temp_dir().join(format!("rill-move-{}", std::process::id()));
+        let (old_dir, new_dir) = (root.join("old"), root.join("new"));
+        let uri = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Show";
+        std::fs::create_dir_all(old_dir.join("Show")).unwrap();
+        std::fs::write(old_dir.join("Show/episode.mkv"), b"data").unwrap();
+        std::fs::write(old_dir.join("Show.torrent"), b"metainfo").unwrap();
+
+        assert!(move_content(uri, &old_dir, &new_dir).unwrap());
+        assert!(new_dir.join("Show/episode.mkv").exists());
+        assert!(new_dir.join("Show.torrent").exists());
+        assert!(!old_dir.join("Show").exists());
+
+        // Nothing to move the second time, and nothing is overwritten.
+        assert!(!move_content(uri, &old_dir, &new_dir).unwrap());
+        std::fs::create_dir_all(old_dir.join("Show")).unwrap();
+        let err = move_content(uri, &old_dir, &new_dir).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AlreadyExists);
+        assert!(old_dir.join("Show").exists());
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn moving_a_torrent_leaves_the_file_it_was_added_from_alone() {
+        let root = std::env::temp_dir().join(format!("rill-move-file-{}", std::process::id()));
+        let (source, old_dir, new_dir) = (root.join("source"), root.join("old"), root.join("new"));
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::create_dir_all(old_dir.join("film")).unwrap();
+        let uri = source.join("film.torrent");
+        std::fs::write(&uri, b"metainfo").unwrap();
+
+        let uri = uri.to_string_lossy().into_owned();
+        assert!(move_content(&uri, &old_dir, &new_dir).unwrap());
+        assert!(new_dir.join("film").is_dir());
+        // The .torrent file the user chose stays where the user keeps it.
+        assert!(source.join("film.torrent").exists());
+
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

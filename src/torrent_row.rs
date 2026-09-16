@@ -77,6 +77,9 @@ mod imp {
             });
             klass.install_action("row.open-folder", None, |row, _, _| row.open_folder());
             klass.install_action("row.copy-link", None, |row, _, _| row.copy_link());
+            klass.install_action("row.change-folder", None, |row, _, _| {
+                row.forward("win.change-folder")
+            });
             klass.install_action("row.menu", None, |row, _, _| {
                 let width = row.width() as f64;
                 row.popup_menu(width / 2.0, row.height() as f64 / 2.0);

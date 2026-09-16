@@ -8,7 +8,10 @@ browser, or dropped on the window. A second launch while Rill is running hands i
 or file to the running instance.
 
 The add dialog shows the folder the torrent will be saved to; picking another one there
-changes it for this torrent only. The default is set in Preferences. "Start Immediately"
+changes it for this torrent only. The default is set in Preferences. A .torrent file says
+how big its content is, so the dialog warns when the folder has less room than that; it
+is a warning, not a refusal, and a magnet link says nothing about its size until its
+metadata arrives. "Start Immediately"
 off adds the torrent paused. "Sequential Download" fetches pieces from the start of the
 torrent to the end instead of rarest first, so a video or an archive can be opened before
 the download completes; it can be turned on or off later in the torrent's details.
@@ -21,7 +24,14 @@ dialog.
 Torrents are grouped into Downloading, Paused and Finished; a torrent that failed is
 among the finished ones with a red icon. The button at the end of a row pauses, resumes
 or deletes, and the context menu (right click, a long press, Shift+F10 or the Menu key)
-has the rest: Retry for a failed torrent and Open Folder.
+has the rest: Retry for a failed torrent, Open Folder, Copy Magnet Link, and Change
+Folder, which moves what has been downloaded so far and puts the rest there too. The new
+folder has to be on the same disk; Rill says so and changes nothing when the move fails.
+
+Within each group the main menu orders torrents by the date they were added, their name,
+their size or how far along they are; torrents that compare equal keep the order they
+were added in. Pause All and Resume All, also in the main menu, act on every torrent in
+the list.
 
 Ctrl+F searches the names. Selection mode, from the main menu or Select in a context
 menu, acts on several torrents at once: the bar at the bottom resumes, pauses or deletes
