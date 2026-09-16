@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-16 09:00+0300\n"
+"POT-Creation-Date: 2026-09-16 09:19+0300\n"
 "PO-Revision-Date: 2026-09-14 00:00+0300\n"
 "Last-Translator: sachesi <xsachesi@pm.me>\n"
 "Language-Team: Ukrainian\n"
@@ -27,7 +27,7 @@ msgid "BitTorrent Client"
 msgstr "Клієнт BitTorrent"
 
 #: data/io.github.sachesi.rill.desktop:4
-#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:164
+#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:163
 #: src/tray.rs:38
 #, no-c-format
 msgid "Download files over BitTorrent"
@@ -188,43 +188,48 @@ msgid "First release."
 msgstr "Перший випуск."
 
 #. Translators: put your name here, one per line, optionally with an email address.
-#: src/application.rs:166
+#: src/application.rs:165
 #, no-c-format
 msgid "translator-credits"
 msgstr "sachesi <xsachesi@pm.me>"
 
-#: src/dialogs/add_torrent.rs:115 ui/shortcuts_dialog.ui:21
+#: src/dialogs/add_torrent.rs:120 ui/shortcuts_dialog.ui:21
 #, no-c-format
 msgid "Add Magnet Link"
 msgstr "Додати magnet-посилання"
 
-#: src/dialogs/add_torrent.rs:122 src/window.rs:341 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:127 src/window.rs:496 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr "Додати торент-файл"
 
-#: src/dialogs/add_torrent.rs:140 src/window.rs:336
+#: src/dialogs/add_torrent.rs:163
+#, no-c-format
+msgid "Not enough space in this folder: %1 needed, %2 free"
+msgstr "Недостатньо місця в цій теці: потрібно %1, вільно %2"
+
+#: src/dialogs/add_torrent.rs:172 src/window.rs:491
 #, no-c-format
 msgid "Torrent Files"
 msgstr "Торент-файли"
 
-#: src/dialogs/add_torrent.rs:145
+#: src/dialogs/add_torrent.rs:177
 #, no-c-format
 msgid "Choose a Torrent File"
 msgstr "Виберіть торент-файл"
 
-#: src/dialogs/add_torrent.rs:167
+#: src/dialogs/add_torrent.rs:199 src/window.rs:695
 #, no-c-format
 msgid "Choose a Download Folder"
 msgstr "Виберіть теку для завантаження"
 
-#: src/dialogs/add_torrent.rs:203
+#: src/dialogs/add_torrent.rs:235
 #, no-c-format
 msgid "This is not a magnet link"
 msgstr "Це не magnet-посилання"
 
 #. Translators: %s is a file name.
-#: src/dialogs/add_torrent.rs:232
+#: src/dialogs/add_torrent.rs:264
 #, no-c-format
 msgid "“%s” is not a torrent file"
 msgstr "«%s» не є торент-файлом"
@@ -307,12 +312,12 @@ msgid "Failed"
 msgstr "Помилка"
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:279
+#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:310
 #, no-c-format
 msgid "%1 of %2"
 msgstr "%1 з %2"
 
-#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:286
+#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:317
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr "Очікування метаданих"
@@ -338,37 +343,42 @@ msgid "Encrypted connection"
 msgstr "Зашифроване з’єднання"
 
 #. Translators: a torrent without a name yet; %s is the start of its info hash.
-#: src/torrent_row.rs:160
+#: src/torrent_row.rs:164
 #, no-c-format
 msgid "Torrent %s"
 msgstr "Торент %s"
 
-#: src/torrent_row.rs:184
+#: src/torrent_row.rs:188
 #, no-c-format
 msgid "Pause"
 msgstr "Призупинити"
 
-#: src/torrent_row.rs:190
+#: src/torrent_row.rs:194
 #, no-c-format
 msgid "Resume"
 msgstr "Відновити"
 
-#: src/torrent_row.rs:196 src/torrent_row.rs:202
+#: src/torrent_row.rs:200 src/torrent_row.rs:206
 #, no-c-format
 msgid "Delete"
 msgstr "Видалити"
 
-#: src/torrent_row.rs:249
+#: src/torrent_row.rs:253
 #, no-c-format
 msgid "Could not open the folder"
 msgstr "Не вдалося відкрити теку"
 
-#: src/torrent_row.rs:287
+#: src/torrent_row.rs:269
+#, no-c-format
+msgid "Magnet link copied"
+msgstr "Magnet-посилання скопійовано"
+
+#: src/torrent_row.rs:318
 #, no-c-format
 msgid "Size unknown"
 msgstr "Розмір невідомий"
 
-#: src/torrent_row.rs:296
+#: src/torrent_row.rs:327
 #, no-c-format
 msgid "%d peer"
 msgid_plural "%d peers"
@@ -416,12 +426,12 @@ msgstr "%1 год %2 хв"
 msgid "%1d %2h"
 msgstr "%1 д %2 год"
 
-#: src/window.rs:184
+#: src/window.rs:202
 #, no-c-format
 msgid "Rill is still running"
 msgstr "Rill продовжує працювати"
 
-#: src/window.rs:186
+#: src/window.rs:204
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
@@ -430,17 +440,17 @@ msgstr ""
 "Завантаження тривають у фоні. Скористайтеся значком у системному лотку, щоб "
 "знову відкрити Rill або вийти з нього."
 
-#: src/window.rs:355
+#: src/window.rs:510
 #, no-c-format
 msgid "Only local files can be added"
 msgstr "Можна додавати лише локальні файли"
 
-#: src/window.rs:464
+#: src/window.rs:619
 #, no-c-format
 msgid "Select Torrents"
 msgstr "Вибір торентів"
 
-#: src/window.rs:466
+#: src/window.rs:621
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
@@ -448,23 +458,28 @@ msgstr[0] "Вибрано %d"
 msgstr[1] "Вибрано %d"
 msgstr[2] "Вибрано %d"
 
-#: src/window.rs:527
+#: src/window.rs:734
+#, no-c-format
+msgid "Could not move the files; the folder is unchanged"
+msgstr "Не вдалося перемістити файли; теку не змінено"
+
+#: src/window.rs:772
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr "Видалити торент?"
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:529
+#: src/window.rs:774
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr "«%s» буде вилучено зі списку."
 
-#: src/window.rs:533
+#: src/window.rs:778
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr "Видалити торенти?"
 
-#: src/window.rs:535
+#: src/window.rs:780
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
@@ -472,43 +487,43 @@ msgstr[0] "%d торент буде вилучено зі списку."
 msgstr[1] "%d торенти буде вилучено зі списку."
 msgstr[2] "%d торентів буде вилучено зі списку."
 
-#: src/window.rs:543
+#: src/window.rs:788
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr "Також видалити завантажені файли"
 
-#: src/window.rs:551 ui/add_torrent_dialog.ui:21 ui/window.ui:64
+#: src/window.rs:796 ui/add_torrent_dialog.ui:21 ui/window.ui:99
 #, no-c-format
 msgid "_Cancel"
 msgstr "_Скасувати"
 
-#: src/window.rs:552
+#: src/window.rs:797
 #, no-c-format
 msgid "_Delete"
 msgstr "_Видалити"
 
-#: src/window.rs:617
+#: src/window.rs:862
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr "Не вдалося видалити завантажені файли: %s"
 
-#: src/window.rs:626
+#: src/window.rs:871
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr "Не вдалося знайти завантажені файли"
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:709
+#: src/window.rs:954
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr "Помилка в «%1»: %2"
 
-#: src/window.rs:721
+#: src/window.rs:966
 #, no-c-format
 msgid "Download Complete"
 msgstr "Завантаження завершено"
 
-#: src/window.rs:814
+#: src/window.rs:1062
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr "Не вдалося зберегти торент: %s"
@@ -599,7 +614,7 @@ msgstr "Скільки Rill пише у стандартний потік пом
 msgid "General"
 msgstr "Загальні"
 
-#: ui/shortcuts_dialog.ui:27 ui/window.ui:89
+#: ui/shortcuts_dialog.ui:27 ui/window.ui:124
 msgid "Search"
 msgstr "Пошук"
 
@@ -699,11 +714,11 @@ msgstr "Трекери"
 msgid "Trackers listed by the torrent"
 msgstr "Трекери, зазначені в торенті"
 
-#: ui/torrent_row.ui:12 ui/torrent_row.ui:62 ui/window.ui:238
+#: ui/torrent_row.ui:12 ui/torrent_row.ui:70 ui/window.ui:273
 msgid "_Pause"
 msgstr "_Призупинити"
 
-#: ui/torrent_row.ui:17 ui/torrent_row.ui:58 ui/window.ui:231
+#: ui/torrent_row.ui:17 ui/torrent_row.ui:66 ui/window.ui:266
 msgid "_Resume"
 msgstr "_Відновити"
 
@@ -715,19 +730,27 @@ msgstr "_Повторити"
 msgid "_Open Folder"
 msgstr "_Відкрити теку"
 
-#: ui/torrent_row.ui:34
+#: ui/torrent_row.ui:32
+msgid "_Copy Magnet Link"
+msgstr "_Копіювати magnet-посилання"
+
+#: ui/torrent_row.ui:36
+msgid "Change _Folder…"
+msgstr "Змінити _теку…"
+
+#: ui/torrent_row.ui:42
 msgid "_Select"
 msgstr "_Вибрати"
 
-#: ui/torrent_row.ui:40 ui/torrent_row.ui:68 ui/window.ui:245
+#: ui/torrent_row.ui:48 ui/torrent_row.ui:76 ui/window.ui:280
 msgid "_Delete…"
 msgstr "_Видалити…"
 
-#: ui/torrent_row.ui:48
+#: ui/torrent_row.ui:56
 msgid "Select _All"
 msgstr "Вибрати _все"
 
-#: ui/torrent_row.ui:52
+#: ui/torrent_row.ui:60
 msgid "Select _None"
 msgstr "_Скасувати вибір"
 
@@ -740,62 +763,90 @@ msgid "Add _Magnet Link…"
 msgstr "Додати _magnet-посилання…"
 
 #: ui/window.ui:24
+msgid "_Pause All"
+msgstr "Призупинити _всі"
+
+#: ui/window.ui:28
+msgid "_Resume All"
+msgstr "Відновити вс_і"
+
+#: ui/window.ui:34
+msgid "Sort _By"
+msgstr "_Впорядкувати за"
+
+#: ui/window.ui:37
+msgid "_Date Added"
+msgstr "_Датою додавання"
+
+#: ui/window.ui:42
+msgid "_Name"
+msgstr "_Назвою"
+
+#: ui/window.ui:47
+msgid "_Size"
+msgstr "_Розміром"
+
+#: ui/window.ui:52
+msgid "_Progress"
+msgstr "_Поступом"
+
+#: ui/window.ui:59
 msgid "_Select Torrents"
 msgstr "_Вибрати торенти"
 
-#: ui/window.ui:30
+#: ui/window.ui:65
 msgid "_Preferences"
 msgstr "_Налаштування"
 
-#: ui/window.ui:34
+#: ui/window.ui:69
 msgid "_Keyboard Shortcuts"
 msgstr "_Комбінації клавіш"
 
-#: ui/window.ui:38
+#: ui/window.ui:73
 msgid "_About Rill"
 msgstr "_Про Rill"
 
-#: ui/window.ui:42
+#: ui/window.ui:77
 msgid "_Quit"
 msgstr "Ви_йти"
 
-#: ui/window.ui:73
+#: ui/window.ui:108
 msgid "Add Torrent"
 msgstr "Додати торент"
 
-#: ui/window.ui:81
+#: ui/window.ui:116
 msgid "Main Menu"
 msgstr "Головне меню"
 
-#: ui/window.ui:104
+#: ui/window.ui:139
 msgid "Search torrents"
 msgstr "Пошук торентів"
 
-#: ui/window.ui:122
+#: ui/window.ui:157
 msgid "No Torrents"
 msgstr "Немає торентів"
 
-#: ui/window.ui:123
+#: ui/window.ui:158
 msgid "Add a magnet link or a .torrent file, or drop one on this window"
 msgstr ""
 "Додайте magnet-посилання чи файл .torrent або перетягніть його на це вікно"
 
-#: ui/window.ui:134
+#: ui/window.ui:169
 msgid "No Results"
 msgstr "Нічого не знайдено"
 
-#: ui/window.ui:135
+#: ui/window.ui:170
 msgid "No torrent name matches the search"
 msgstr "Жодна назва торента не відповідає пошуку"
 
-#: ui/window.ui:159
+#: ui/window.ui:194
 msgid "Downloading"
 msgstr "Завантаження"
 
-#: ui/window.ui:178
+#: ui/window.ui:213
 msgid "Paused"
 msgstr "Призупинено"
 
-#: ui/window.ui:198
+#: ui/window.ui:233
 msgid "Finished"
 msgstr "Завершені"

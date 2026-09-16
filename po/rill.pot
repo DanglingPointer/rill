@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill 0.2.0\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-16 09:00+0300\n"
+"POT-Creation-Date: 2026-09-16 09:20+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -28,7 +28,7 @@ msgid "BitTorrent Client"
 msgstr ""
 
 #: data/io.github.sachesi.rill.desktop:4
-#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:164
+#: data/io.github.sachesi.rill.metainfo.xml:7 src/application.rs:163
 #: src/tray.rs:38
 #, no-c-format
 msgid "Download files over BitTorrent"
@@ -148,43 +148,48 @@ msgid "First release."
 msgstr ""
 
 #. Translators: put your name here, one per line, optionally with an email address.
-#: src/application.rs:166
+#: src/application.rs:165
 #, no-c-format
 msgid "translator-credits"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:115 ui/shortcuts_dialog.ui:21
+#: src/dialogs/add_torrent.rs:120 ui/shortcuts_dialog.ui:21
 #, no-c-format
 msgid "Add Magnet Link"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:122 src/window.rs:341 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:127 src/window.rs:496 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:140 src/window.rs:336
+#: src/dialogs/add_torrent.rs:163
+#, no-c-format
+msgid "Not enough space in this folder: %1 needed, %2 free"
+msgstr ""
+
+#: src/dialogs/add_torrent.rs:172 src/window.rs:491
 #, no-c-format
 msgid "Torrent Files"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:145
+#: src/dialogs/add_torrent.rs:177
 #, no-c-format
 msgid "Choose a Torrent File"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:167
+#: src/dialogs/add_torrent.rs:199 src/window.rs:695
 #, no-c-format
 msgid "Choose a Download Folder"
 msgstr ""
 
-#: src/dialogs/add_torrent.rs:203
+#: src/dialogs/add_torrent.rs:235
 #, no-c-format
 msgid "This is not a magnet link"
 msgstr ""
 
 #. Translators: %s is a file name.
-#: src/dialogs/add_torrent.rs:232
+#: src/dialogs/add_torrent.rs:264
 #, no-c-format
 msgid "“%s” is not a torrent file"
 msgstr ""
@@ -267,12 +272,12 @@ msgid "Failed"
 msgstr ""
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:279
+#: src/dialogs/torrent_info.rs:219 src/torrent_row.rs:310
 #, no-c-format
 msgid "%1 of %2"
 msgstr ""
 
-#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:286
+#: src/dialogs/torrent_info.rs:223 src/torrent_row.rs:317
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr ""
@@ -298,37 +303,42 @@ msgid "Encrypted connection"
 msgstr ""
 
 #. Translators: a torrent without a name yet; %s is the start of its info hash.
-#: src/torrent_row.rs:160
+#: src/torrent_row.rs:164
 #, no-c-format
 msgid "Torrent %s"
 msgstr ""
 
-#: src/torrent_row.rs:184
+#: src/torrent_row.rs:188
 #, no-c-format
 msgid "Pause"
 msgstr ""
 
-#: src/torrent_row.rs:190
+#: src/torrent_row.rs:194
 #, no-c-format
 msgid "Resume"
 msgstr ""
 
-#: src/torrent_row.rs:196 src/torrent_row.rs:202
+#: src/torrent_row.rs:200 src/torrent_row.rs:206
 #, no-c-format
 msgid "Delete"
 msgstr ""
 
-#: src/torrent_row.rs:249
+#: src/torrent_row.rs:253
 #, no-c-format
 msgid "Could not open the folder"
 msgstr ""
 
-#: src/torrent_row.rs:287
+#: src/torrent_row.rs:269
+#, no-c-format
+msgid "Magnet link copied"
+msgstr ""
+
+#: src/torrent_row.rs:318
 #, no-c-format
 msgid "Size unknown"
 msgstr ""
 
-#: src/torrent_row.rs:296
+#: src/torrent_row.rs:327
 #, no-c-format
 msgid "%d peer"
 msgid_plural "%d peers"
@@ -375,95 +385,100 @@ msgstr ""
 msgid "%1d %2h"
 msgstr ""
 
-#: src/window.rs:184
+#: src/window.rs:202
 #, no-c-format
 msgid "Rill is still running"
 msgstr ""
 
-#: src/window.rs:186
+#: src/window.rs:204
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
 "Rill."
 msgstr ""
 
-#: src/window.rs:355
+#: src/window.rs:510
 #, no-c-format
 msgid "Only local files can be added"
 msgstr ""
 
-#: src/window.rs:464
+#: src/window.rs:619
 #, no-c-format
 msgid "Select Torrents"
 msgstr ""
 
-#: src/window.rs:466
+#: src/window.rs:621
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:527
+#: src/window.rs:734
+#, no-c-format
+msgid "Could not move the files; the folder is unchanged"
+msgstr ""
+
+#: src/window.rs:772
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr ""
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:529
+#: src/window.rs:774
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr ""
 
-#: src/window.rs:533
+#: src/window.rs:778
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr ""
 
-#: src/window.rs:535
+#: src/window.rs:780
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/window.rs:543
+#: src/window.rs:788
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr ""
 
-#: src/window.rs:551 ui/add_torrent_dialog.ui:21 ui/window.ui:64
+#: src/window.rs:796 ui/add_torrent_dialog.ui:21 ui/window.ui:99
 #, no-c-format
 msgid "_Cancel"
 msgstr ""
 
-#: src/window.rs:552
+#: src/window.rs:797
 #, no-c-format
 msgid "_Delete"
 msgstr ""
 
-#: src/window.rs:617
+#: src/window.rs:862
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr ""
 
-#: src/window.rs:626
+#: src/window.rs:871
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr ""
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:709
+#: src/window.rs:954
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr ""
 
-#: src/window.rs:721
+#: src/window.rs:966
 #, no-c-format
 msgid "Download Complete"
 msgstr ""
 
-#: src/window.rs:814
+#: src/window.rs:1062
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr ""
@@ -550,7 +565,7 @@ msgstr ""
 msgid "General"
 msgstr ""
 
-#: ui/shortcuts_dialog.ui:27 ui/window.ui:89
+#: ui/shortcuts_dialog.ui:27 ui/window.ui:124
 msgid "Search"
 msgstr ""
 
@@ -650,11 +665,11 @@ msgstr ""
 msgid "Trackers listed by the torrent"
 msgstr ""
 
-#: ui/torrent_row.ui:12 ui/torrent_row.ui:62 ui/window.ui:238
+#: ui/torrent_row.ui:12 ui/torrent_row.ui:70 ui/window.ui:273
 msgid "_Pause"
 msgstr ""
 
-#: ui/torrent_row.ui:17 ui/torrent_row.ui:58 ui/window.ui:231
+#: ui/torrent_row.ui:17 ui/torrent_row.ui:66 ui/window.ui:266
 msgid "_Resume"
 msgstr ""
 
@@ -666,19 +681,27 @@ msgstr ""
 msgid "_Open Folder"
 msgstr ""
 
-#: ui/torrent_row.ui:34
+#: ui/torrent_row.ui:32
+msgid "_Copy Magnet Link"
+msgstr ""
+
+#: ui/torrent_row.ui:36
+msgid "Change _Folder…"
+msgstr ""
+
+#: ui/torrent_row.ui:42
 msgid "_Select"
 msgstr ""
 
-#: ui/torrent_row.ui:40 ui/torrent_row.ui:68 ui/window.ui:245
+#: ui/torrent_row.ui:48 ui/torrent_row.ui:76 ui/window.ui:280
 msgid "_Delete…"
 msgstr ""
 
-#: ui/torrent_row.ui:48
+#: ui/torrent_row.ui:56
 msgid "Select _All"
 msgstr ""
 
-#: ui/torrent_row.ui:52
+#: ui/torrent_row.ui:60
 msgid "Select _None"
 msgstr ""
 
@@ -691,61 +714,89 @@ msgid "Add _Magnet Link…"
 msgstr ""
 
 #: ui/window.ui:24
-msgid "_Select Torrents"
+msgid "_Pause All"
 msgstr ""
 
-#: ui/window.ui:30
-msgid "_Preferences"
+#: ui/window.ui:28
+msgid "_Resume All"
 msgstr ""
 
 #: ui/window.ui:34
-msgid "_Keyboard Shortcuts"
+msgid "Sort _By"
 msgstr ""
 
-#: ui/window.ui:38
-msgid "_About Rill"
+#: ui/window.ui:37
+msgid "_Date Added"
 msgstr ""
 
 #: ui/window.ui:42
-msgid "_Quit"
+msgid "_Name"
+msgstr ""
+
+#: ui/window.ui:47
+msgid "_Size"
+msgstr ""
+
+#: ui/window.ui:52
+msgid "_Progress"
+msgstr ""
+
+#: ui/window.ui:59
+msgid "_Select Torrents"
+msgstr ""
+
+#: ui/window.ui:65
+msgid "_Preferences"
+msgstr ""
+
+#: ui/window.ui:69
+msgid "_Keyboard Shortcuts"
 msgstr ""
 
 #: ui/window.ui:73
+msgid "_About Rill"
+msgstr ""
+
+#: ui/window.ui:77
+msgid "_Quit"
+msgstr ""
+
+#: ui/window.ui:108
 msgid "Add Torrent"
 msgstr ""
 
-#: ui/window.ui:81
+#: ui/window.ui:116
 msgid "Main Menu"
 msgstr ""
 
-#: ui/window.ui:104
+#: ui/window.ui:139
 msgid "Search torrents"
 msgstr ""
 
-#: ui/window.ui:122
+#: ui/window.ui:157
 msgid "No Torrents"
 msgstr ""
 
-#: ui/window.ui:123
+#: ui/window.ui:158
 msgid "Add a magnet link or a .torrent file, or drop one on this window"
 msgstr ""
 
-#: ui/window.ui:134
+#: ui/window.ui:169
 msgid "No Results"
 msgstr ""
 
-#: ui/window.ui:135
+#: ui/window.ui:170
 msgid "No torrent name matches the search"
 msgstr ""
 
-#: ui/window.ui:159
+#: ui/window.ui:194
 msgid "Downloading"
 msgstr ""
 
-#: ui/window.ui:178
+#: ui/window.ui:213
 msgid "Paused"
 msgstr ""
 
-#: ui/window.ui:198
+#: ui/window.ui:233
 msgid "Finished"
 msgstr ""
