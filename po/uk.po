@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-16 10:13+0300\n"
+"POT-Creation-Date: 2026-09-16 10:41+0300\n"
 "PO-Revision-Date: 2026-09-14 00:00+0300\n"
 "Last-Translator: sachesi <xsachesi@pm.me>\n"
 "Language-Team: Ukrainian\n"
@@ -198,7 +198,7 @@ msgstr "sachesi <xsachesi@pm.me>"
 msgid "Add Magnet Link"
 msgstr "Додати magnet-посилання"
 
-#: src/dialogs/add_torrent.rs:127 src/window.rs:515 ui/shortcuts_dialog.ui:15
+#: src/dialogs/add_torrent.rs:127 src/window.rs:563 ui/shortcuts_dialog.ui:15
 #, no-c-format
 msgid "Add Torrent File"
 msgstr "Додати торент-файл"
@@ -208,7 +208,7 @@ msgstr "Додати торент-файл"
 msgid "Not enough space in this folder: %1 needed, %2 free"
 msgstr "Недостатньо місця в цій теці: потрібно %1, вільно %2"
 
-#: src/dialogs/add_torrent.rs:172 src/window.rs:510
+#: src/dialogs/add_torrent.rs:172 src/window.rs:558
 #, no-c-format
 msgid "Torrent Files"
 msgstr "Торент-файли"
@@ -218,7 +218,7 @@ msgstr "Торент-файли"
 msgid "Choose a Torrent File"
 msgstr "Виберіть торент-файл"
 
-#: src/dialogs/add_torrent.rs:199 src/window.rs:733
+#: src/dialogs/add_torrent.rs:199 src/window.rs:782
 #, no-c-format
 msgid "Choose a Download Folder"
 msgstr "Виберіть теку для завантаження"
@@ -312,12 +312,12 @@ msgid "Failed"
 msgstr "Помилка"
 
 #. Translators: progress of a torrent, "1.2 GiB of 4.0 GiB".
-#: src/dialogs/torrent_info.rs:232 src/torrent_row.rs:345
+#: src/dialogs/torrent_info.rs:232 src/torrent_row.rs:396
 #, no-c-format
 msgid "%1 of %2"
 msgstr "%1 з %2"
 
-#: src/dialogs/torrent_info.rs:236 src/torrent_row.rs:352
+#: src/dialogs/torrent_info.rs:236 src/torrent_row.rs:403
 #, no-c-format
 msgid "Waiting for metadata"
 msgstr "Очікування метаданих"
@@ -343,53 +343,65 @@ msgid "Encrypted connection"
 msgstr "Зашифроване з’єднання"
 
 #. Translators: a torrent without a name yet; %s is the start of its info hash.
-#: src/torrent_row.rs:175
+#: src/torrent_row.rs:180
 #, no-c-format
 msgid "Torrent %s"
 msgstr "Торент %s"
 
-#: src/torrent_row.rs:214
+#: src/torrent_row.rs:254
 #, no-c-format
 msgid "Pause"
 msgstr "Призупинити"
 
-#: src/torrent_row.rs:220
+#: src/torrent_row.rs:260
 #, no-c-format
 msgid "Resume"
 msgstr "Відновити"
 
-#: src/torrent_row.rs:226 src/torrent_row.rs:232
+#: src/torrent_row.rs:266 src/torrent_row.rs:272
 #, no-c-format
 msgid "Delete"
 msgstr "Видалити"
 
-#: src/torrent_row.rs:279
+#: src/torrent_row.rs:319
 #, no-c-format
 msgid "Could not open the folder"
 msgstr "Не вдалося відкрити теку"
 
-#: src/torrent_row.rs:295
+#: src/torrent_row.rs:335
 #, no-c-format
 msgid "Magnet link copied"
 msgstr "Magnet-посилання скопійовано"
 
-#: src/torrent_row.rs:335
+#: src/torrent_row.rs:376
+#, no-c-format
+msgid "Queued"
+msgstr "У черзі"
+
+#. Translators: a torrent waiting for a free download slot; %s is its progress,
+#. "1.2 GiB of 4.0 GiB".
+#: src/torrent_row.rs:380
+#, no-c-format
+msgid "Queued · %s"
+msgstr "У черзі · %s"
+
+#: src/torrent_row.rs:386
 #, no-c-format
 msgid "Files not found"
 msgstr "Файли не знайдено"
 
 #. Translators: some of a torrents files are gone; %s is how much is left, "1.2 GiB".
-#: src/torrent_row.rs:338
+#: src/torrent_row.rs:389
 #, no-c-format
 msgid "Some files not found, %s left"
 msgstr "Частину файлів не знайдено, залишилось %s"
 
-#: src/torrent_row.rs:353
+#: src/torrent_row.rs:404
 #, no-c-format
 msgid "Size unknown"
 msgstr "Розмір невідомий"
 
-#: src/torrent_row.rs:362
+#: src/torrent_row.rs:413
 #, no-c-format
 msgid "%d peer"
 msgid_plural "%d peers"
@@ -437,12 +449,12 @@ msgstr "%1 год %2 хв"
 msgid "%1d %2h"
 msgstr "%1 д %2 год"
 
-#: src/window.rs:203
+#: src/window.rs:210
 #, no-c-format
 msgid "Rill is still running"
 msgstr "Rill продовжує працювати"
 
-#: src/window.rs:205
+#: src/window.rs:212
 #, no-c-format
 msgid ""
 "Downloads continue in the background. Use the tray icon to reopen or quit "
@@ -451,17 +463,17 @@ msgstr ""
 "Завантаження тривають у фоні. Скористайтеся значком у системному лотку, щоб "
 "знову відкрити Rill або вийти з нього."
 
-#: src/window.rs:529
+#: src/window.rs:577
 #, no-c-format
 msgid "Only local files can be added"
 msgstr "Можна додавати лише локальні файли"
 
-#: src/window.rs:638
+#: src/window.rs:686
 #, no-c-format
 msgid "Select Torrents"
 msgstr "Вибір торентів"
 
-#: src/window.rs:640
+#: src/window.rs:688
 #, no-c-format
 msgid "%d selected"
 msgid_plural "%d selected"
@@ -469,28 +481,28 @@ msgstr[0] "Вибрано %d"
 msgstr[1] "Вибрано %d"
 msgstr[2] "Вибрано %d"
 
-#: src/window.rs:772
+#: src/window.rs:821
 #, no-c-format
 msgid "Could not move the files; the folder is unchanged"
 msgstr "Не вдалося перемістити файли; теку не змінено"
 
-#: src/window.rs:810
+#: src/window.rs:859
 #, no-c-format
 msgid "Delete Torrent?"
 msgstr "Видалити торент?"
 
 #. Translators: %s is the name of a torrent.
-#: src/window.rs:812
+#: src/window.rs:861
 #, no-c-format
 msgid "“%s” will be removed from the list."
 msgstr "«%s» буде вилучено зі списку."
 
-#: src/window.rs:816
+#: src/window.rs:865
 #, no-c-format
 msgid "Delete Torrents?"
 msgstr "Видалити торенти?"
 
-#: src/window.rs:818
+#: src/window.rs:867
 #, no-c-format
 msgid "%d torrent will be removed from the list."
 msgid_plural "%d torrents will be removed from the list."
@@ -498,43 +510,43 @@ msgstr[0] "%d торент буде вилучено зі списку."
 msgstr[1] "%d торенти буде вилучено зі списку."
 msgstr[2] "%d торентів буде вилучено зі списку."
 
-#: src/window.rs:826
+#: src/window.rs:875
 #, no-c-format
 msgid "Also delete the downloaded files"
 msgstr "Також видалити завантажені файли"
 
-#: src/window.rs:834 ui/add_torrent_dialog.ui:21 ui/window.ui:99
+#: src/window.rs:883 ui/add_torrent_dialog.ui:21 ui/window.ui:99
 #, no-c-format
 msgid "_Cancel"
 msgstr "_Скасувати"
 
-#: src/window.rs:835
+#: src/window.rs:884
 #, no-c-format
 msgid "_Delete"
 msgstr "_Видалити"
 
-#: src/window.rs:900
+#: src/window.rs:953
 #, no-c-format
 msgid "Could not delete the downloaded files: %s"
 msgstr "Не вдалося видалити завантажені файли: %s"
 
-#: src/window.rs:909
+#: src/window.rs:962
 #, no-c-format
 msgid "Could not find the downloaded files"
 msgstr "Не вдалося знайти завантажені файли"
 
 #. Translators: %1 is a torrent name, %2 the reason it failed.
-#: src/window.rs:992
+#: src/window.rs:1051
 #, no-c-format
 msgid "“%1” failed: %2"
 msgstr "Помилка в «%1»: %2"
 
-#: src/window.rs:1004
+#: src/window.rs:1063
 #, no-c-format
 msgid "Download Complete"
 msgstr "Завантаження завершено"
 
-#: src/window.rs:1103
+#: src/window.rs:1170
 #, no-c-format
 msgid "Could not save the torrent: %s"
 msgstr "Не вдалося зберегти торент: %s"

@@ -53,9 +53,10 @@ only when "Also delete the downloaded files" is checked.
 ## The queue
 
 At most "Simultaneous Downloads" torrents (Preferences, 3 by default) download at a time.
-When one more starts, the newest is paused until a slot frees up; when one finishes or is
-paused, the oldest waiting torrent starts. A torrent you paused yourself is never started
-by the queue.
+A torrent you start yourself, by resuming it or adding it, always starts: when that makes
+one too many, the download started most recently before it waits instead. When a download
+finishes or is paused, the oldest waiting torrent starts. Waiting torrents are among the
+paused ones and say "Queued"; a torrent you paused yourself is never started by the queue.
 
 ## Details
 

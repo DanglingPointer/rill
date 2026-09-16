@@ -533,7 +533,11 @@ impl RillWindow {
                 .add_paused(name, uri, dir, sequential, self.sender())
         };
         // A torrent deleted earlier in this session may come back.
-        self.imp().torrents.borrow_mut().undelete(&hash);
+        let mut torrents = self.imp().torrents.borrow_mut();
+        torrents.undelete(&hash);
+        if start_now {
+            torrents.user_start(&hash);
+        }
     }
 
     /// Where Rill keeps its database and copies of .torrent files.
@@ -712,6 +716,7 @@ impl RillWindow {
     fn resume_all(&self) {
         self.for_each_in_state(TorrentUiState::Paused, |window, hash| {
             window.imp().torrents.borrow_mut().enqueue(hash);
+            window.show_queued(hash);
             // Saved as waiting to download, so that a restart starts it too.
             let latest = window
                 .imp()
@@ -753,7 +758,7 @@ impl RillWindow {
         if !matches!(row.state(), TorrentUiState::Paused | TorrentUiState::Error) {
             return;
         }
-        imp.torrents.borrow_mut().leave_queue(hash);
+        imp.torrents.borrow_mut().user_start(hash);
         if let Some(mut update) = row.latest() {
             update.state = TorrentUiState::Downloading;
             self.process_update(&update);
@@ -1104,6 +1109,7 @@ impl RillWindow {
             },
         };
         let old_state = row.state();
+        row.set_queued(imp.torrents.borrow().is_queued(&update.info_hash));
         row.update(&update);
         imp.torrents
             .borrow_mut()
@@ -1267,6 +1273,7 @@ impl RillWindow {
                 tx.clone(),
             );
             let row = self.make_row(&torrent.info_hash);
+            row.set_queued(self.imp().torrents.borrow().is_queued(&torrent.info_hash));
             row.update(&update);
             self.list_for(state).append(&row);
         }
@@ -1498,10 +1505,21 @@ impl RillWindow {
         }
         for hash in &plan.pause {
             engine.toggle(hash);
+            self.show_queued(hash);
         }
         for hash in &plan.start {
             log::info!("Starting queued torrent {hash}");
             engine.toggle(hash);
+            self.show_queued(hash);
+        }
+    }
+
+    /// Lets a torrent's row say whether the queue holds it.
+    fn show_queued(&self, hash: &str) {
+        let queued = self.imp().torrents.borrow().is_queued(hash);
+        let row = self.imp().rows.borrow().get(hash).cloned();
+        if let Some(row) = row {
+            row.set_queued(queued);
         }
     }
 }

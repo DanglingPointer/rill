@@ -22,8 +22,11 @@ struct Entry {
     /// stored as downloading, so after a restart too.
     queued: bool,
     /// When it was added, then the order this session learnt of it in: the queue starts
-    /// the oldest first and pauses the newest first.
+    /// the oldest first.
     added: (i64, u64),
+    /// When this session last started it, in the order of starts; 0 when it has not. Over
+    /// the limit, the queue pauses the most recently started first.
+    started: u64,
     /// What was last sent to the database, and when.
     persisted: Option<(PersistedSnapshot, Instant)>,
 }
@@ -35,6 +38,9 @@ pub struct Torrents {
     /// Deleted torrents, whose late updates are dropped.
     deleted: HashSet<String>,
     next_seq: u64,
+    /// Torrents the user has just started, which the queue keeps running while it can.
+    /// Forgotten once the queue has run, unless the torrent has yet to arrive.
+    user_started: HashSet<String>,
 }
 
 /// What the queue does: the torrents to pause and the ones to start.
@@ -66,15 +72,37 @@ impl Torrents {
     fn insert(&mut self, hash: &str, state: TorrentUiState, added_at: i64, queued: bool) {
         self.deleted.remove(hash);
         self.next_seq += 1;
+        let started = if state == TorrentUiState::Downloading {
+            self.next_seq
+        } else {
+            0
+        };
         self.entries.insert(
             hash.to_string(),
             Entry {
                 state,
                 queued,
                 added: (added_at, self.next_seq),
+                started,
                 persisted: None,
             },
         );
+    }
+
+    /// The user started the torrent, one they had paused or one being added: it leaves the
+    /// queue, and should that take the downloads over the limit, another one waits instead.
+    pub fn user_start(&mut self, hash: &str) {
+        self.next_seq += 1;
+        if let Some(entry) = self.entries.get_mut(hash) {
+            entry.queued = false;
+            entry.started = self.next_seq;
+        }
+        self.user_started.insert(hash.to_string());
+    }
+
+    /// Whether the queue holds the torrent, to start it when a slot frees up.
+    pub fn is_queued(&self, hash: &str) -> bool {
+        self.entries.get(hash).is_some_and(|entry| entry.queued)
     }
 
     /// When the torrent was added, and where it came in this session, which is what the
@@ -166,9 +194,11 @@ impl Torrents {
     }
 
     /// Decides the queue, when at most `limit` downloads may run and `is_running` says
-    /// which torrents the engine runs: the newest downloads over the limit are paused and
-    /// held, or the oldest held ones start while there is room.
+    /// which torrents the engine runs: the downloads over the limit are paused and held,
+    /// the most recently started first but the ones the user has just started last, or the
+    /// oldest held ones start while there is room.
     pub fn plan_queue(&mut self, limit: usize, is_running: impl Fn(&str) -> bool) -> QueuePlan {
+        let mut user_started = std::mem::take(&mut self.user_started);
         let mut running = Vec::new();
         let mut waiting = Vec::new();
         for (hash, entry) in &self.entries {
@@ -176,7 +206,7 @@ impl Torrents {
                 continue;
             }
             if is_running(hash) {
-                running.push((hash, entry.added));
+                running.push((hash, user_started.contains(hash), entry.started));
             } else if entry.queued {
                 waiting.push((hash, entry.added));
             }
@@ -184,11 +214,11 @@ impl Torrents {
 
         let mut plan = QueuePlan::default();
         if running.len() > limit {
-            running.sort_by_key(|&(_, added)| std::cmp::Reverse(added));
+            running.sort_by_key(|&(_, by_user, started)| (by_user, std::cmp::Reverse(started)));
             let excess = running.len() - limit;
             plan.pause = running[..excess]
                 .iter()
-                .map(|(h, _)| h.to_string())
+                .map(|(h, _, _)| h.to_string())
                 .collect();
         } else {
             waiting.sort_by_key(|&(_, added)| added);
@@ -205,8 +235,15 @@ impl Torrents {
             }
         }
         for hash in &plan.start {
-            self.leave_queue(hash);
+            self.next_seq += 1;
+            if let Some(entry) = self.entries.get_mut(hash) {
+                entry.queued = false;
+                entry.started = self.next_seq;
+            }
         }
+        // A torrent being added is started before the window knows it.
+        user_started.retain(|hash| !self.entries.contains_key(hash));
+        self.user_started = user_started;
         plan
     }
 }
@@ -313,6 +350,72 @@ mod tests {
         assert_eq!(
             torrents.plan_queue(2, running(&["running"])),
             plan(&[], &["a"])
+        );
+    }
+
+    #[test]
+    fn a_torrent_the_user_starts_over_the_limit_runs_and_the_latest_other_one_waits() {
+        let mut torrents = Torrents::default();
+        for (hash, added) in [("old", 1), ("new", 2), ("paused", 3)] {
+            torrents.add(hash, Downloading, added);
+        }
+        torrents.set_state("paused", Paused);
+        torrents.leave_queue("paused");
+        // Started in the order old, new: new is the most recent start.
+        assert_eq!(
+            torrents.plan_queue(2, running(&["old", "new"])),
+            plan(&[], &[])
+        );
+
+        torrents.user_start("paused");
+        let all = running(&["old", "new", "paused"]);
+        assert_eq!(torrents.plan_queue(2, all), plan(&["new"], &[]));
+        assert!(torrents.is_queued("new"));
+        assert!(!torrents.is_queued("paused"));
+
+        // Once a slot frees up, the one that gave way comes back.
+        torrents.set_state("old", Completed);
+        assert_eq!(
+            torrents.plan_queue(2, running(&["paused"])),
+            plan(&[], &["new"])
+        );
+
+        // Having run, a torrent the user started is no longer spared: it is now the most
+        // recent start but one, and the latest start gives way.
+        torrents.add("added", Downloading, 4);
+        let all = running(&["paused", "new", "added"]);
+        assert_eq!(torrents.plan_queue(2, all), plan(&["added"], &[]));
+    }
+
+    #[test]
+    fn a_torrent_the_user_adds_is_spared_even_when_the_queue_runs_before_it_arrives() {
+        let mut torrents = Torrents::default();
+        torrents.add("running", Downloading, 1);
+        torrents.user_start("added");
+        assert_eq!(
+            torrents.plan_queue(1, running(&["running"])),
+            plan(&[], &[])
+        );
+
+        torrents.add("added", Downloading, 2);
+        assert_eq!(
+            torrents.plan_queue(1, running(&["running", "added"])),
+            plan(&["running"], &[])
+        );
+    }
+
+    #[test]
+    fn torrents_the_user_starts_together_over_the_limit_keep_the_earliest_started() {
+        let mut torrents = Torrents::default();
+        for (hash, added) in [("a", 1), ("b", 2), ("c", 3)] {
+            torrents.add(hash, Paused, added);
+        }
+        for hash in ["c", "a", "b"] {
+            torrents.user_start(hash);
+        }
+        assert_eq!(
+            torrents.plan_queue(2, running(&["a", "b", "c"])),
+            plan(&["b"], &[])
         );
     }
 

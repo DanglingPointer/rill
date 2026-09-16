@@ -44,6 +44,8 @@ mod imp {
 
         pub info_hash: RefCell<String>,
         pub state: Cell<TorrentUiState>,
+        /// The download queue holds it, to start when a slot frees up.
+        pub queued: Cell<bool>,
         /// Its files were found gone; said instead of its progress until it runs again.
         pub files_missing: Cell<bool>,
         /// The current run has its files on disk: until then a run started after they were
@@ -188,6 +190,8 @@ impl TorrentRow {
         }
         imp.status_label.set_text(&if imp.files_missing.get() {
             missing_text(update)
+        } else if imp.queued.get() && update.state == TorrentUiState::Paused {
+            queued_text(update)
         } else {
             status_text(update)
         });
@@ -197,6 +201,17 @@ impl TorrentRow {
             0.0
         });
         self.set_state(update.state);
+    }
+
+    /// Says whether the download queue holds the torrent. The row shows it from its next
+    /// snapshot on, or at once when it has one.
+    pub fn set_queued(&self, queued: bool) {
+        if self.imp().queued.replace(queued) == queued {
+            return;
+        }
+        if let Some(update) = self.latest() {
+            self.update(&update);
+        }
     }
 
     /// Whether the files of the torrent are worth looking for: it is not running, or its run
@@ -352,6 +367,17 @@ fn magnet_link(update: &UiUpdate) -> String {
         link
     } else {
         format!("{link}&dn={}", urlencoding::encode(&update.name))
+    }
+}
+
+fn queued_text(update: &UiUpdate) -> String {
+    let size = status_text(update);
+    if update.total == 0 {
+        gettext("Queued")
+    } else {
+        // Translators: a torrent waiting for a free download slot; %s is its progress,
+        // "1.2 GiB of 4.0 GiB".
+        gettext("Queued · %s").replace("%s", &size)
     }
 }
 
