@@ -19,8 +19,14 @@ use crate::storage::Storage;
 use crate::util::{format_eta, format_rate, format_size};
 
 /// How long a change of the sequential switch wins over snapshots that still carry the
-/// old value.
-const SEQUENTIAL_GRACE: Duration = Duration::from_secs(2);
+/// old value: the wait below, plus the time until the restarted torrent sends its first
+/// snapshot, plus room to spare.
+const SEQUENTIAL_GRACE: Duration = Duration::from_secs(4);
+
+/// How long the switch waits for the user to settle before the engine acts on it. Each
+/// change restarts the torrent, which costs it its peers, so a burst of flicking the
+/// switch back and forth is worth only one restart.
+const SEQUENTIAL_DEBOUNCE: Duration = Duration::from_secs(1);
 
 mod imp {
     use super::*;
@@ -70,6 +76,10 @@ mod imp {
         /// Set while the switch is changed from a snapshot rather than by the user.
         pub updating: Cell<bool>,
         pub sequential_changed: Cell<Option<Instant>>,
+        /// Counts changes of the switch, so a waiting one can tell it has been
+        /// overtaken by a later change. Shared with the waiting ones, which outlive a
+        /// dialog closed right after the switch moved.
+        pub sequential_changes: Rc<Cell<u64>>,
         pub metadata_loaded: Cell<bool>,
         pub metadata_loading: Cell<bool>,
     }
@@ -250,9 +260,20 @@ impl TorrentInfoDialog {
         }
         imp.sequential_changed.set(Some(Instant::now()));
         let hash = imp.info_hash.borrow().clone();
-        if let Some(engine) = imp.engine.borrow().as_ref() {
-            engine.set_sequential(&hash, active);
+        if let Some(engine) = imp.engine.borrow().clone() {
+            let changes = imp.sequential_changes.clone();
+            let change = changes.get().wrapping_add(1);
+            changes.set(change);
+            let hash = hash.clone();
+            // A dialog closed in the meantime leaves its last change to be applied: it
+            // is what the user asked for, and what the database now holds.
+            glib::timeout_add_local_once(SEQUENTIAL_DEBOUNCE, move || {
+                if changes.get() == change {
+                    engine.set_sequential(&hash, active);
+                }
+            });
         }
+
         let Some(storage) = imp.storage.borrow().clone() else {
             return;
         };
