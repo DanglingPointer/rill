@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rill\n"
 "Report-Msgid-Bugs-To: https://github.com/sachesi/rill/issues\n"
-"POT-Creation-Date: 2026-09-16 10:41+0300\n"
+"POT-Creation-Date: 2026-09-16 11:28+0300\n"
 "PO-Revision-Date: 2026-09-14 00:00+0300\n"
 "Last-Translator: sachesi <xsachesi@pm.me>\n"
 "Language-Team: Ukrainian\n"
@@ -88,7 +88,70 @@ msgstr ""
 "Передавання тривають у фоні після закриття вікна, якщо в середовищі є "
 "системний лоток"
 
-#: data/io.github.sachesi.rill.metainfo.xml:40
+#: data/io.github.sachesi.rill.metainfo.xml:22
+msgid "Torrents downloading, paused and finished"
+msgstr "Торенти, що завантажуються, призупинені та завершені"
+
+#: data/io.github.sachesi.rill.metainfo.xml:26
+msgid "Adding a torrent file"
+msgstr "Додавання торент-файлу"
+
+#: data/io.github.sachesi.rill.metainfo.xml:30
+msgid "Progress, speed and peers of a torrent"
+msgstr "Поступ, швидкість і піри торента"
+
+#: data/io.github.sachesi.rill.metainfo.xml:34
+msgid "The files of a torrent"
+msgstr "Файли торента"
+
+#: data/io.github.sachesi.rill.metainfo.xml:38 ui/shortcuts_dialog.ui:33
+msgid "Preferences"
+msgstr "Налаштування"
+
+#: data/io.github.sachesi.rill.metainfo.xml:62
+msgid ""
+"Torrents pick up where they left off after Rill restarts. The list can be "
+"ordered by name, size or progress, every torrent can be paused or resumed at "
+"once, a torrent's magnet link can be copied, and its download folder can be "
+"changed after it was added, moving the files that are already there. Rill "
+"warns when a torrent needs more room than its folder has."
+msgstr ""
+"Після перезапуску Rill торенти продовжують з того місця, де зупинилися. "
+"Список можна впорядкувати за назвою, розміром або поступом, усі торенти "
+"можна призупинити або відновити разом, магнет-посилання торента можна "
+"скопіювати, а теку завантаження можна змінити після додавання, разом із уже "
+"завантаженими файлами. Rill попереджає, коли торенту потрібно більше місця, "
+"ніж є в його теці."
+
+#: data/io.github.sachesi.rill.metainfo.xml:63
+msgid ""
+"A torrent whose files were removed is paused and marked as having files not "
+"found, instead of showing as finished, and resuming it downloads them again. "
+"A torrent you start while the download limit is reached runs anyway, and the "
+"download started most recently waits in the queue, marked as queued. Resume "
+"All starts torrents only as far as the limit allows."
+msgstr ""
+"Торент, файли якого вилучено, призупиняється й позначається як такий, чиї "
+"файли не знайдено, замість того щоб показуватися завершеним, а відновлення "
+"завантажує їх знову. Торент, який ви запускаєте, коли досягнуто обмеження "
+"завантажень, однаково запускається, а завантаження, розпочате останнім, "
+"чекає в черзі з позначкою «У черзі». «Відновити всі» запускає торенти лише в"
+" межах обмеження."
+
+#: data/io.github.sachesi.rill.metainfo.xml:64
+msgid ""
+"Rill now uses mtorrent 0.6.0. Each running torrent listens on a port of its "
+"own, the DHT keeps working when another client holds port 6881, and magnet "
+"links without a name get a folder of their own. The window no longer redraws "
+"on every update, which could stall the display with many torrents and peers."
+msgstr ""
+"Rill тепер використовує mtorrent 0.6.0. Кожен запущений торент слухає на "
+"власному порту, DHT працює й тоді, коли порт 6881 зайнятий іншим клієнтом, а"
+" магнет-посилання без назви отримують власну теку. Вікно більше не "
+"перемальовується за кожного оновлення, через що з багатьма торентами й "
+"пірами відображення могло зависати."
+
+#: data/io.github.sachesi.rill.metainfo.xml:69
 msgid ""
 "The application id is now io.github.sachesi.rill. The dialogs adapt to "
 "narrow windows and open as bottom sheets on phones, and the details of a "
@@ -100,7 +163,7 @@ msgstr ""
 "аркуші, а вкладки подробиць торента переходять униз, коли вгорі для них "
 "немає місця."
 
-#: data/io.github.sachesi.rill.metainfo.xml:41
+#: data/io.github.sachesi.rill.metainfo.xml:70
 msgid ""
 "The add dialog shows the folder a torrent will be saved to. Selection mode "
 "has a bar with Resume, Pause and Delete, a search that matches nothing says "
@@ -114,7 +177,7 @@ msgstr ""
 "контекстне меню торента відкривається клавішею меню. Зміна кількості "
 "одночасних завантажень діє одразу."
 
-#: data/io.github.sachesi.rill.metainfo.xml:42
+#: data/io.github.sachesi.rill.metainfo.xml:71
 msgid ""
 "Preferences no longer offer bandwidth limits, an upload limit, a seeding "
 "ratio or a logging switch: none of them had any effect on transfers. The "
@@ -126,7 +189,7 @@ msgstr ""
 "передавання. Сторінка «Трекери» більше не позначає кожен трекер підключеним, "
 "а сторінка «Файли» більше не показує прапорці, які нічого не робили."
 
-#: data/io.github.sachesi.rill.metainfo.xml:47
+#: data/io.github.sachesi.rill.metainfo.xml:76
 msgid ""
 "The same torrent added as a magnet link and as a file is one transfer, not "
 "two. A torrent you pause is no longer resumed by the download queue, a "
@@ -142,7 +205,7 @@ msgstr ""
 "завершеним. Посилання і файли, які не є торентами, вікно додавання відхиляє, "
 "замість того щоб створювати передавання, яке ніколи не почнеться."
 
-#: data/io.github.sachesi.rill.metainfo.xml:48
+#: data/io.github.sachesi.rill.metainfo.xml:77
 msgid ""
 "Magnet links can be dropped on the window, closing the window quits when "
 "there is no system tray to reopen it from, and more of the interface is "
@@ -152,14 +215,14 @@ msgstr ""
 "роботу, якщо немає системного лотка, з якого його можна відкрити знову, і "
 "більше інтерфейсу перекладено."
 
-#: data/io.github.sachesi.rill.metainfo.xml:53
+#: data/io.github.sachesi.rill.metainfo.xml:82
 msgid ""
 "More reliable tracking of each torrent's state across pauses and restarts."
 msgstr ""
 "Надійніше відстеження стану кожного торента між призупиненнями і "
 "перезапусками."
 
-#: data/io.github.sachesi.rill.metainfo.xml:58
+#: data/io.github.sachesi.rill.metainfo.xml:87
 msgid ""
 "Ukrainian translation. The source of a torrent can be copied from its "
 "details, and its folder opened from the context menu. File paths inside a "
@@ -171,11 +234,11 @@ msgstr ""
 "вказувати за межі теки завантажень, а трекери на локальних адресах каналу "
 "відхиляються."
 
-#: data/io.github.sachesi.rill.metainfo.xml:63
+#: data/io.github.sachesi.rill.metainfo.xml:92
 msgid "A new application icon."
 msgstr "Новий значок застосунку."
 
-#: data/io.github.sachesi.rill.metainfo.xml:68
+#: data/io.github.sachesi.rill.metainfo.xml:97
 msgid ""
 "Database writes and torrent metadata parsing no longer run on the thread "
 "that draws the window."
@@ -183,7 +246,7 @@ msgstr ""
 "Запис до бази даних і розбір метаданих торентів більше не виконуються в "
 "потоці, що малює вікно."
 
-#: data/io.github.sachesi.rill.metainfo.xml:73
+#: data/io.github.sachesi.rill.metainfo.xml:102
 msgid "First release."
 msgstr "Перший випуск."
 
@@ -640,10 +703,6 @@ msgstr "Загальні"
 #: ui/shortcuts_dialog.ui:27 ui/window.ui:124
 msgid "Search"
 msgstr "Пошук"
-
-#: ui/shortcuts_dialog.ui:33
-msgid "Preferences"
-msgstr "Налаштування"
 
 #: ui/shortcuts_dialog.ui:39
 msgid "Keyboard Shortcuts"

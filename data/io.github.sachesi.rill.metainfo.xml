@@ -16,6 +16,28 @@
       <li>Transfers continue in the background when the window is closed, on desktops with a system tray</li>
     </ul>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/sachesi/rill/v0.3.0/data/screenshots/main.png</image>
+      <caption>Torrents downloading, paused and finished</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sachesi/rill/v0.3.0/data/screenshots/add-torrent.png</image>
+      <caption>Adding a torrent file</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sachesi/rill/v0.3.0/data/screenshots/details-overview.png</image>
+      <caption>Progress, speed and peers of a torrent</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sachesi/rill/v0.3.0/data/screenshots/details-files.png</image>
+      <caption>The files of a torrent</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/sachesi/rill/v0.3.0/data/screenshots/preferences.png</image>
+      <caption>Preferences</caption>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">io.github.sachesi.rill.desktop</launchable>
   <url type="homepage">https://github.com/sachesi/rill</url>
   <url type="bugtracker">https://github.com/sachesi/rill/issues</url>

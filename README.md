@@ -14,6 +14,10 @@ to sequential downloading, so a video can be watched while it arrives. On deskto
 system tray, closing the window leaves the transfers running in the background, and a
 torrent that was downloading when Rill closed carries on the next time it starts.
 
+<p align="center">
+  <img src="data/screenshots/main.png" alt="Rill with torrents downloading, paused and finished">
+</p>
+
 ## Limitations
 
 Rill does not seed. A torrent shares pieces with other peers while it downloads, but stops
