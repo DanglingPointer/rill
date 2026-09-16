@@ -258,8 +258,22 @@ impl TorrentEngine {
                 let local = tokio::task::LocalSet::new();
                 local
                     .run_until(async {
+                        // The last run of each torrent. A new run waits for the one before
+                        // it to end, which a pause or restart has already asked of it, so
+                        // that the two never share the torrent's files.
+                        let mut runs: HashMap<String, tokio::task::JoinHandle<()>> = HashMap::new();
                         while let Some(cmd) = cmd_rx.recv().await {
-                            tokio::task::spawn_local(run_torrent(cmd, shared.clone()));
+                            runs.retain(|_, run| !run.is_finished());
+                            let previous = runs.remove(&cmd.info_hash);
+                            let hash = cmd.info_hash.clone();
+                            let shared = shared.clone();
+                            let run = tokio::task::spawn_local(async move {
+                                if let Some(previous) = previous {
+                                    let _ = previous.await;
+                                }
+                                run_torrent(cmd, shared).await
+                            });
+                            runs.insert(hash, run);
                         }
                     })
                     .await;
@@ -610,6 +624,25 @@ async fn run_torrent(cmd: StartCmd, shared: Shared) {
     // with ENOENT if the dir is missing.
     if let Err(e) = std::fs::create_dir_all(&output_dir) {
         log::warn!("Failed to create output dir {:?}: {}", output_dir, e);
+    }
+
+    // Files removed since the last run would otherwise count as downloaded: mtorrent takes
+    // the pieces its progress file lists without reading them again. No run of this
+    // torrent is left to write that file.
+    let (check_uri, check_dir) = (uri.clone(), output_dir.clone());
+    let missing = tokio::task::spawn_blocking(move || {
+        let layout = crate::torrent_paths::content_layout(&check_uri, &check_dir);
+        layout.as_ref().and_then(|layout| {
+            crate::torrent_paths::find_missing_content(&check_uri, &check_dir, Some(layout), true)
+        })
+    })
+    .await;
+    if let Ok(Some(missing)) = missing {
+        log::info!(
+            "Torrent {} is missing files; {} bytes left to keep",
+            info_hash,
+            missing.present_bytes
+        );
     }
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));

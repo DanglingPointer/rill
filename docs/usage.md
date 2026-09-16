@@ -34,10 +34,11 @@ were added in. Pause All and Resume All, also in the main menu, act on every tor
 the list; Resume All starts no more than the download limit allows, and the rest follow
 as downloads finish.
 
-When Rill starts, it looks for the files of every torrent that has downloaded something.
-A torrent whose files were removed or cut short while Rill was not running moves to
-Paused and says which: none of its files were found, or some were and how much is left.
-Resuming it downloads what is missing again.
+Rill looks for the files of every torrent that has downloaded something when it starts,
+and every ten seconds after. A torrent whose files were removed or cut short is paused,
+moves to Paused and says which: none of its files were found, or some were and how much
+is left. Resuming it downloads what is missing again, and so does resuming a torrent
+whose files went missing too recently to have been noticed.
 
 Ctrl+F searches the names. Selection mode, from the main menu or Select in a context
 menu, acts on several torrents at once: the bar at the bottom resumes, pauses or deletes

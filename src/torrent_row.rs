@@ -193,6 +193,11 @@ impl TorrentRow {
         self.set_state(update.state);
     }
 
+    /// Whether the torrent's files were found gone since it last ran.
+    pub fn files_missing(&self) -> bool {
+        self.imp().files_missing.get()
+    }
+
     /// Says the torrent's files are gone, some or all, until it runs again.
     pub fn show_files_missing(&self) {
         self.imp().files_missing.set(true);

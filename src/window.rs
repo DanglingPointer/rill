@@ -5,6 +5,8 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
@@ -70,6 +72,11 @@ mod imp {
         /// Whether the notice that Rill keeps running in the tray has been sent.
         pub background_notice_sent: Cell<bool>,
         pub queue_check_pending: Cell<bool>,
+        /// Set while the files of the torrents are being looked for.
+        pub checking_files: Cell<bool>,
+        /// The layout of each torrent's content, read from its metadata once rather than
+        /// on every look for its files.
+        pub layouts: Arc<Layouts>,
     }
 
     #[glib::object_subclass]
@@ -272,6 +279,43 @@ mod imp {
             }
         }
     }
+}
+
+/// How often the files of the torrents are looked for, to notice ones removed while Rill
+/// runs.
+const FILE_CHECK_INTERVAL: Duration = Duration::from_secs(10);
+
+/// The content layout of each torrent, by info hash, with the source and folder it was
+/// read for.
+type Layouts = Mutex<HashMap<String, (String, PathBuf, Arc<torrent_paths::ContentLayout>)>>;
+
+/// The layout of the torrent `update` is about, read once and kept in `layouts` for as long
+/// as the torrent keeps its source and folder. Not kept while there is none to read.
+fn cached_layout(
+    layouts: &Layouts,
+    hash: &str,
+    update: &UiUpdate,
+) -> Option<Arc<torrent_paths::ContentLayout>> {
+    let lock = || layouts.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((uri, dir, layout)) = lock().get(hash)
+        && *uri == update.uri
+        && *dir == update.output_dir
+    {
+        return Some(layout.clone());
+    }
+    let layout = Arc::new(torrent_paths::content_layout(
+        &update.uri,
+        &update.output_dir,
+    )?);
+    lock().insert(
+        hash.to_string(),
+        (
+            update.uri.clone(),
+            update.output_dir.clone(),
+            layout.clone(),
+        ),
+    );
+    Some(layout)
 }
 
 /// What the torrent list is ordered by.
@@ -853,6 +897,10 @@ impl RillWindow {
     fn delete_torrent(&self, hash: &str, delete_data: bool) {
         let imp = self.imp();
         imp.torrents.borrow_mut().delete(hash);
+        imp.layouts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(hash);
         let dialog = imp.info_dialogs.borrow_mut().remove(hash);
         if let Some(dialog) = dialog {
             dialog.close();
@@ -1033,6 +1081,13 @@ impl RillWindow {
                 update.total_pieces = previous.total_pieces;
                 update.downloaded_pieces = previous.downloaded_pieces;
             }
+            // The run a torrent found missing files was paused from reports what it had
+            // counted, removed files included.
+            let files_missing = existing.as_ref().is_some_and(TorrentRow::files_missing);
+            if files_missing && update.state == TorrentUiState::Paused {
+                update.downloaded = previous.downloaded;
+                update.downloaded_pieces = previous.downloaded_pieces;
+            }
         }
 
         let row = match existing {
@@ -1177,7 +1232,6 @@ impl RillWindow {
 
     fn restore_torrents(&self, saved: Vec<SavedTorrent>) {
         let tx = self.sender();
-        let mut to_check = Vec::new();
         for torrent in saved {
             let state = self.imp().torrents.borrow_mut().restore(
                 &torrent.info_hash,
@@ -1209,26 +1263,48 @@ impl RillWindow {
             let row = self.make_row(&torrent.info_hash);
             row.update(&update);
             self.list_for(state).append(&row);
-            // A failed torrent says so already, and one with nothing downloaded has
-            // nothing to lose.
-            if state != TorrentUiState::Error && torrent.downloaded > 0 {
-                to_check.push((
-                    torrent.info_hash.clone(),
-                    torrent.uri.clone(),
-                    torrent.output_dir_path(),
-                ));
-            }
         }
         self.update_sections();
-        self.find_missing_files(to_check);
+        // Torrents still stored as downloading are started once their files have been
+        // looked for, so that one whose files are gone waits for the user instead.
+        self.check_files(true);
+        glib::timeout_add_local(
+            FILE_CHECK_INTERVAL,
+            glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[upgrade_or]
+                glib::ControlFlow::Break,
+                move || {
+                    window.check_files(false);
+                    glib::ControlFlow::Continue
+                }
+            ),
+        );
     }
 
-    /// Looks for the files of `torrents` (info hash, source, folder) off the main thread,
-    /// and shows the ones whose files were removed while Rill was not running as paused
-    /// with what is left. Then starts the torrents stored as downloading, as far as the
-    /// queue allows, which waits for this: mtorrent must not read a progress file that is
-    /// about to be corrected.
-    fn find_missing_files(&self, torrents: Vec<(String, String, PathBuf)>) {
+    /// Looks for the files of every torrent with something downloaded, off the main thread,
+    /// and shows the ones whose files were removed or cut short as paused, with what is
+    /// left. With `then_queue`, the download queue runs once that is done.
+    fn check_files(&self, then_queue: bool) {
+        let imp = self.imp();
+        if imp.checking_files.replace(true) {
+            return;
+        }
+        // A failed torrent says so already, one with nothing downloaded has nothing to lose,
+        // and one already found missing stays so until it runs again.
+        let torrents: Vec<(String, TorrentUiState, UiUpdate)> = imp
+            .rows
+            .borrow()
+            .iter()
+            .filter(|(_, row)| {
+                row.state() != TorrentUiState::Error
+                    && !row.files_missing()
+                    && (row.state() == TorrentUiState::Completed || row.progress().0 > 0)
+            })
+            .filter_map(|(hash, row)| Some((hash.clone(), row.state(), row.latest()?)))
+            .collect();
+        let layouts = imp.layouts.clone();
         glib::spawn_future_local(glib::clone!(
             #[weak(rename_to = window)]
             self,
@@ -1236,41 +1312,74 @@ impl RillWindow {
                 let missing = gio::spawn_blocking(move || {
                     torrents
                         .into_iter()
-                        .filter_map(|(hash, uri, dir)| {
-                            torrent_paths::find_missing_content(&uri, &dir)
-                                .map(|missing| (hash, missing))
+                        .filter_map(|(hash, state, update)| {
+                            let layout = cached_layout(&layouts, &hash, &update);
+                            // Only looked at: a running torrent may be writing its progress
+                            // file, and the engine corrects it before the next run anyway.
+                            let missing = torrent_paths::find_missing_content(
+                                &update.uri,
+                                &update.output_dir,
+                                layout.as_deref(),
+                                false,
+                            )?;
+                            Some((hash, state, update.output_dir, missing))
                         })
                         .collect::<Vec<_>>()
                 })
                 .await
                 .unwrap_or_default();
-                for (hash, missing) in missing {
-                    window.show_files_missing(&hash, missing);
+                window.imp().checking_files.set(false);
+                for (hash, state, output_dir, missing) in missing {
+                    window.show_files_missing(&hash, state, &output_dir, missing);
                 }
-                window.check_queue();
+                if then_queue {
+                    window.check_queue();
+                }
             }
         ));
     }
 
-    fn show_files_missing(&self, hash: &str, missing: torrent_paths::MissingContent) {
+    /// Shows a torrent found `missing` files as paused, provided it is still in the `state`
+    /// and the folder it was looked for in. A running torrent is paused: mtorrent would go on
+    /// writing to the removed files and count them as downloaded.
+    fn show_files_missing(
+        &self,
+        hash: &str,
+        state: TorrentUiState,
+        output_dir: &Path,
+        missing: torrent_paths::MissingContent,
+    ) {
         let Some(row) = self.imp().rows.borrow().get(hash).cloned() else {
             return;
         };
-        // Resumed in the meantime: its own snapshots will tell.
-        if self.engine().is_active(hash) {
+        let moved = row
+            .latest()
+            .is_none_or(|update| update.output_dir != output_dir);
+        if row.state() != state || moved {
             return;
         }
         log::warn!(
             "Files of {hash} are missing; {} bytes left",
             missing.present_bytes
         );
+        match state {
+            TorrentUiState::Downloading => self.pause_torrent(hash),
+            // Its run is over, but the engine still counts it as running: resuming it must
+            // start a new one.
+            TorrentUiState::Completed if self.engine().is_active(hash) => {
+                self.engine().toggle(hash)
+            }
+            _ => {}
+        }
+        // Not for the queue to start behind the user's back either.
+        self.imp().torrents.borrow_mut().leave_queue(hash);
+        row.show_files_missing();
         if let Some(mut update) = row.latest() {
             update.state = TorrentUiState::Paused;
             update.downloaded = missing.present_bytes.min(update.total);
             update.downloaded_pieces = missing.present_pieces as usize;
             self.process_update(&update);
         }
-        row.show_files_missing();
     }
 
     fn persist(&self, update: &UiUpdate) {
