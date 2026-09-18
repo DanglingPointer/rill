@@ -12,6 +12,8 @@ license=('GPL-3.0-or-later' 'Apache-2.0')
 depends=('gtk4>=1:4.20' 'libadwaita>=1:1.8' 'glib2' 'cairo' 'hicolor-icon-theme' 'libgcc' 'glibc')
 makedepends=('cargo' 'blueprint-compiler' 'just' 'gettext')
 conflicts=('rill' 'rill-git' 'rill-bin')
+# SQLite is compiled in; the Rust linker cannot read the objects makepkg's LTO makes of it.
+options=('!lto')
 source=("$_name-$pkgver.tar.gz::$url/archive/v$pkgver/$_name-$pkgver.tar.gz")
 sha256sums=('SKIP')
 
