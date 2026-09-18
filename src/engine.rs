@@ -813,7 +813,7 @@ fn hash_uri(uri: &str) -> String {
     use sha1::{Digest, Sha1};
     let mut hasher = Sha1::new();
     hasher.update(uri.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hex(&hasher.finalize().into())
 }
 
 /// Canonical identity for a torrent: the real BitTorrent info hash (hex) when

@@ -18,8 +18,8 @@ log = "0.4"
 env_logger = "0.11"
 dirs-next = "2"
 urlencoding = "2"
-rusqlite = { version = "0.32", features = ["bundled"] }
-sha1 = "0.10"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha1 = "0.11"
 ksni = { version = "0.3.4", default-features = false, features = ["blocking", "async-io"] }
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
 libc = "0.2"
